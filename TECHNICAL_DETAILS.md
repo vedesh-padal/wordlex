@@ -174,6 +174,28 @@ curl "http://localhost:17432/search?q=run&limit=5" | jq .
 
 ---
 
+## CLI Integration (Headless Mode)
+
+For tools and keyboard launchers (like our Vicinae extension) that want fully offline, headless access without requiring the desktop GUI app to be running, WordLex supports structured JSON output flags:
+
+| Flag | Output | Description |
+|---|---|---|
+| `wordlex --cli-json <word>` | JSON object | Full word details (senses, synonyms, relations) |
+| `wordlex --search-json <prefix>` | JSON array | Prefix autocomplete suggestions |
+| `wordlex --random-json` | JSON | A random word's full details |
+
+These flags query the SQLite database directly and output raw, compact JSON to stdout, making integration extremely fast (~30-50ms) and robust.
+
+**Example:**
+
+```bash
+wordlex --cli-json ephemeral | jq .
+wordlex --search-json run | jq .
+wordlex --random-json | jq .
+```
+
+---
+
 ## Data Source
 
 This app uses the [Open English WordNet (OEWN)](https://en-word.net/) 2025 edition in SQLite format.
