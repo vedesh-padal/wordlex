@@ -63,7 +63,14 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
     <article style={{ animation: "fadeIn 0.3s ease-out" }}>
       <div className="word-header">
         <div>
-          <h1 className="word-title">{word.word}</h1>
+          <h1 className="word-title">
+            {word.word}
+            {word.pronunciation && (
+              <span style={{ fontSize: "1.25rem", color: "var(--color-text-muted)", marginLeft: "1rem", fontWeight: "normal" }}>
+                /{word.pronunciation}/
+              </span>
+            )}
+          </h1>
           {word.derived_forms.length > 0 && (
             <p className="word-forms">Forms: {word.derived_forms.join(", ")}</p>
           )}

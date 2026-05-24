@@ -24,6 +24,7 @@ pub struct WordSense {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WordDetail {
     pub word: String,
+    pub pronunciation: Option<String>,
     pub senses: Vec<WordSense>,
     /// Lemmas of hypernym synset members ("type of" relationships)
     pub hypernyms: Vec<String>,

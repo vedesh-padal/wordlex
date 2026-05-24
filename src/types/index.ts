@@ -14,6 +14,7 @@ export interface WordSense {
 /** Full detail for a looked-up word. */
 export interface WordDetail {
   word: string;
+  pronunciation?: string;
   senses: WordSense[];
   /** "Type of" relationships */
   hypernyms: string[];

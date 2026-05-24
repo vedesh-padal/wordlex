@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, Result, OptionalExtension};
 use std::collections::HashMap;
 
 use crate::models::{SearchResult, WordDetail, WordSense};
@@ -200,6 +200,17 @@ pub fn lookup_word(conn: &Connection, word_query: &str) -> Result<Option<WordDet
         |row| row.get(0),
     )?;
 
+    // Get pronunciation (if any)
+    let pronunciation: Option<String> = conn.query_row(
+        "SELECT p.pronunciation 
+         FROM lexes_pronunciations lp
+         JOIN pronunciations p ON p.pronunciationid = lp.pronunciationid
+         WHERE lp.wordid = ?1
+         LIMIT 1",
+        params![wordid],
+        |row| row.get(0),
+    ).optional()?;
+
     // Get all senses with definitions, POS, and sense ordering
     let mut sense_stmt = conn.prepare(
         "SELECT DISTINCT s.synsetid, ss.posid, ss.definition, COALESCE(s.sensenum, 0) as sensenum
@@ -305,6 +316,7 @@ pub fn lookup_word(conn: &Connection, word_query: &str) -> Result<Option<WordDet
 
     Ok(Some(WordDetail {
         word,
+        pronunciation,
         senses,
         hypernyms,
         hyponyms,
