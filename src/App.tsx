@@ -81,13 +81,18 @@ export default function App() {
               await window.setFocus();
 
               try {
+                // Wait 150ms for Wayland to grant active focus to the window
+                await new Promise((resolve) => setTimeout(resolve, 150));
+                
                 const clipText = await readText();
                 if (clipText && clipText.trim().length > 0 && clipText.trim().length < 30) {
-                  // If it's a single word or short phrase, auto-search
-                  const sanitized = clipText.trim();
-                  search.setQuery(sanitized);
-                  detail.lookup(sanitized);
-                  history.push(sanitized);
+                  // If it's a single word without spaces
+                  if (!clipText.trim().includes(" ")) {
+                    const sanitized = clipText.trim();
+                    search.setQuery(sanitized);
+                    detail.lookup(sanitized);
+                    history.push(sanitized);
+                  }
                 }
               } catch (err) {
                 console.warn("Failed to read clipboard:", err);
