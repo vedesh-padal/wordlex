@@ -6,12 +6,12 @@ import {
   X,
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Moon,
   Sun,
   Info,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { LogoIcon } from "./LogoIcon";
 
 interface TitleBarProps {
   canGoBack: boolean;
@@ -105,7 +105,7 @@ export function TitleBar({
       {/* Left: Logo */}
       <div className="titlebar-group" data-tauri-drag-region>
         <div className="titlebar-brand" style={{ pointerEvents: "none" }}>
-          <BookOpen size={16} color="var(--color-ring)" />
+          <LogoIcon size={16} color="var(--color-ring)" />
           <span>WordLex</span>
         </div>
       </div>

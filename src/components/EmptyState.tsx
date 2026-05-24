@@ -1,11 +1,10 @@
-import { BookOpen } from "lucide-react";
+import { LogoIcon } from "./LogoIcon";
 
 export function EmptyState() {
   return (
     <div className="empty-state">
-      <div className="empty-icon-wrap">
-        <BookOpen size={36} className="empty-icon" strokeWidth={1.5} />
-        <div className="empty-pulse" />
+      <div className="empty-icon-container">
+        <LogoIcon size={48} color="var(--color-ring)" />
       </div>
 
       <h2 className="empty-title">Start typing to look up a word</h2>

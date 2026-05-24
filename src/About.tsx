@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
-import { BookOpen } from "lucide-react";
+import { LogoIcon } from "./components/LogoIcon";
 
 export default function About() {
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function About() {
         border: "1px solid var(--color-border)",
         marginBottom: "1.5rem"
       }}>
-        <BookOpen size={48} color="var(--color-ring)" />
+        <LogoIcon size={48} color="var(--color-ring)" />
       </div>
       
       <h1 style={{ margin: "0 0 0.5rem 0", fontSize: "2rem", fontWeight: 800, background: "var(--title-gradient)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>

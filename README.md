@@ -1,5 +1,9 @@
 # WordLex
 
+<p align="center">
+  <img src="app-icon.svg" width="128" height="128" alt="WordLex Logo" />
+</p>
+
 A native Linux dictionary and thesaurus — the Linux equivalent of [WordWeb](https://wordweb.info/) for Windows.
 
 **Offline-first, instant lookup, keyboard-driven.**
