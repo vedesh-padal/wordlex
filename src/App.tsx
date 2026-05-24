@@ -107,6 +107,8 @@ export default function App() {
 
   // Keyboard shortcuts
   useEffect(() => {
+    let currentZoom = 100;
+    
     const handler = (e: KeyboardEvent) => {
       // Alt+← / Alt+→ for history navigation
       if (e.altKey && e.key === "ArrowLeft") {
@@ -115,6 +117,23 @@ export default function App() {
       } else if (e.altKey && e.key === "ArrowRight") {
         e.preventDefault();
         handleGoForward();
+      }
+      
+      // Ctrl++ / Ctrl+- for Zooming
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "=" || e.key === "+") {
+          e.preventDefault();
+          currentZoom = Math.min(currentZoom + 10, 150);
+          document.documentElement.style.fontSize = `${currentZoom}%`;
+        } else if (e.key === "-") {
+          e.preventDefault();
+          currentZoom = Math.max(currentZoom - 10, 70);
+          document.documentElement.style.fontSize = `${currentZoom}%`;
+        } else if (e.key === "0") {
+          e.preventDefault();
+          currentZoom = 100;
+          document.documentElement.style.fontSize = "100%";
+        }
       }
     };
 
