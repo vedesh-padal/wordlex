@@ -28,16 +28,30 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
         .join("resources")
         .join("oewn.db");
 
-    if !resource_path.exists() {
-        return Err(format!(
-            "Database not found at {:?}. Please place oewn.db in src-tauri/resources/",
-            resource_path
-        )
-        .into());
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    if !app_data_dir.exists() {
+        std::fs::create_dir_all(&app_data_dir)?;
+    }
+
+    let db_path = app_data_dir.join("oewn.db");
+
+    if !db_path.exists() {
+        if !resource_path.exists() {
+            return Err(format!(
+                "Bundled database not found at {:?}. Please place oewn.db in src-tauri/resources/",
+                resource_path
+            )
+            .into());
+        }
+        std::fs::copy(&resource_path, &db_path)?;
     }
 
     let conn = Connection::open_with_flags(
-        &resource_path,
+        &db_path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
@@ -77,11 +91,10 @@ pub fn run() {
                 // contend with the HTTP server's Arc<Mutex<Connection>>.
                 // Both are read-only so no write contention.
                 {
-                    let resource_path =
-                        app.path().resource_dir()?.join("resources").join("oewn.db");
+                    let db_path = app.path().app_data_dir()?.join("oewn.db");
 
                     let conn2 = Connection::open_with_flags(
-                        &resource_path,
+                        &db_path,
                         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
                             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
                     )?;
