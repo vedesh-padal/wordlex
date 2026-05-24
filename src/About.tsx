@@ -1,9 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
+import { getVersion } from "@tauri-apps/api/app";
 import { LogoIcon } from "./components/LogoIcon";
 
 export default function About() {
+  const [version, setVersion] = useState("0.1.0");
+
   useEffect(() => {
     // Basic theme check
     const saved = localStorage.getItem("wordlex-theme");
@@ -16,6 +19,9 @@ export default function About() {
     
     // Auto-focus window
     getCurrentWindow().setFocus();
+
+    // Fetch version
+    getVersion().then(setVersion).catch(() => {});
   }, []);
 
   return (
@@ -47,7 +53,7 @@ export default function About() {
         WordLex
       </h1>
       <p style={{ margin: "0 0 2rem 0", color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
-        Version 0.1.0
+        Version {version}
       </p>
       
       <p style={{ margin: "0 0 1rem 0", fontSize: "0.95rem", lineHeight: 1.5, maxWidth: "250px" }}>
