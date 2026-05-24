@@ -12,6 +12,8 @@ WordLex is a blisteringly fast, beautifully designed native Linux dictionary and
 - **Smart Clipboard Integration:** Copy any word to your clipboard (`Ctrl+C`), press `Alt+W`, and WordLex will automatically open and instantly define the word.
 - **Modern Minimalist UI:** Built with React, Vite, and Tauri, featuring a beautiful glassmorphic dark-mode interface.
 - **Type-Ahead Search:** Lightning-fast prefix searching powered by an optimized SQLite Full-Text Search (FTS5) index.
+- **Powerful CLI:** Use WordLex from the terminal — with colored output, JSON mode for scripting, and random word discovery.
+- **Vicinae Integration:** Search the dictionary directly from the [Vicinae](https://github.com/vicinaehq/vicinae) launcher with the [WordLex extension](../wordlex-vicinae).
 
 ## 🚀 Installation & Setup
 
@@ -60,6 +62,33 @@ wget -qO src-tauri/resources/oewn.db "https://raw.githubusercontent.com/x-englis
 # 4. Run the Development Server
 npm run tauri dev
 ```
+
+## ⌨️ CLI Usage
+
+WordLex includes a full-featured command-line interface:
+
+```bash
+# Open GUI and search a word
+wordlex ephemeral
+wordlex --search ephemeral
+
+# Terminal output (colored)
+wordlex --cli ephemeral
+
+# JSON output (for scripts/tooling)
+wordlex --cli-json ephemeral       # full word detail as JSON
+wordlex --search-json eph          # prefix search results as JSON
+wordlex --random-json              # random word as JSON
+
+# Clipboard integration
+wordlex --from-clipboard           # read clipboard and search in GUI
+```
+
+## 🔌 Vicinae Extension
+
+Search WordLex directly from the [Vicinae](https://github.com/vicinaehq/vicinae) keyboard launcher — without opening the full desktop app.
+
+See the [wordlex-vicinae](../wordlex-vicinae) extension for installation instructions.
 
 ## 🏗️ Architecture & Technical Details
 

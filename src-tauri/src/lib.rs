@@ -19,7 +19,7 @@ use tauri::{
 #[command(
     name = "wordlex",
     about = "WordLex: A lightning-fast native Linux dictionary and thesaurus.",
-    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --cli-json hello   (Outputs full definition as JSON)\n  wordlex --search-json eph  (Outputs prefix search results as JSON)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)",
+    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --cli-json hello   (Outputs full definition as JSON)\n  wordlex --search-json eph  (Outputs prefix search results as JSON)\n  wordlex --random-json      (Outputs a random word as JSON)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)",
     version
 )]
 struct Cli {
@@ -37,6 +37,10 @@ struct Cli {
     /// Headless mode: output prefix search results as a JSON array to stdout (for tooling integrations).
     #[arg(long)]
     pub search_json: Option<String>,
+
+    /// Headless mode: output a random word's full detail as JSON to stdout (for tooling integrations).
+    #[arg(long, default_value_t = false)]
+    pub random_json: bool,
 
     /// Read the system clipboard and search for its contents in the GUI (Bypasses Wayland hotkey restrictions).
     #[arg(long, default_value_t = false)]
@@ -230,6 +234,30 @@ fn handle_headless_cli(cli: &Cli) -> bool {
         match db::search_words(&conn, prefix, 50) {
             Ok(results) => {
                 println!("{}", serde_json::to_string(&results).unwrap_or_default());
+            }
+            Err(e) => {
+                eprintln!(r#"{{"error":"{}"}}"#, e);
+                std::process::exit(1);
+            }
+        }
+        return true;
+    }
+
+    // ─── --random-json: random word as JSON ─────────────────
+    if cli.random_json {
+        let conn = match open_database_standalone() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!(r#"{{"error":"{}"}}"#, e);
+                std::process::exit(1);
+            }
+        };
+        match db::get_random_word(&conn) {
+            Ok(Some(detail)) => {
+                println!("{}", serde_json::to_string(&detail).unwrap_or_default());
+            }
+            Ok(None) => {
+                println!("null");
             }
             Err(e) => {
                 eprintln!(r#"{{"error":"{}"}}"#, e);
