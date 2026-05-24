@@ -47,6 +47,17 @@ export function SearchBar({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Always allow Esc to clear the search if dropdown is closed
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (isOpen) {
+          setIsOpen(false);
+        } else {
+          onChange("");
+        }
+        return;
+      }
+
       if (!isOpen) {
         if (e.key === "Enter" && value.trim()) {
           onSelect(value.trim());
@@ -73,14 +84,6 @@ export function SearchBar({
           } else if (value.trim()) {
             onSelect(value.trim());
             setIsOpen(false);
-          }
-          break;
-        case "Escape":
-          e.preventDefault();
-          if (isOpen) {
-            setIsOpen(false);
-          } else {
-            onChange("");
           }
           break;
       }
