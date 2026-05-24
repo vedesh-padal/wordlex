@@ -1,7 +1,7 @@
 {
   "name": "wordlex",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Native Linux dictionary and thesaurus powered by Open English WordNet",
   "author": "Vedesh Padal <https://github.com/vedesh-padal>",
   "license": "MIT",
@@ -10,7 +10,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "lint:ts": "tsc --noEmit",
+    "lint:rs": "cd src-tauri && cargo clippy -- -D warnings",
+    "lint": "npm run lint:ts && npm run lint:rs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
