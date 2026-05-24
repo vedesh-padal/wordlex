@@ -30,8 +30,8 @@ export function SearchBar({
   const fetchHistory = useCallback(async () => {
     try {
       const hist = await invoke<string[]>("get_history");
-      // Reverse to get latest first, and filter out empty, then take 15
-      const uniqueHist = Array.from(new Set(hist.filter(Boolean))).reverse();
+      // Filter out empty, get unique items, and take 15 (backend already orders most recent first at index 0)
+      const uniqueHist = Array.from(new Set(hist.filter(Boolean)));
       setRecentHistory(uniqueHist.slice(0, 15));
     } catch (e) {
       console.error("Failed to fetch history:", e);

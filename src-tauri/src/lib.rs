@@ -94,8 +94,109 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
     Ok(conn)
 }
 
+/// Opens the database directly from the XDG app data directory,
+/// without requiring a running Tauri App instance.
+/// This is used by headless CLI commands that must work even when the GUI is already running.
+fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> {
+    // Tauri stores the DB under ~/.local/share/com.wordlex.app/oewn.db
+    let app_data_dir = dirs::data_dir()
+        .ok_or("Could not determine XDG data directory")?
+        .join("com.wordlex.app");
+
+    let db_path = app_data_dir.join("oewn.db");
+
+    if !db_path.exists() {
+        return Err(format!(
+            "WordLex database not found at {:?}. Run the WordLex GUI at least once to initialize the database.",
+            db_path
+        )
+        .into());
+    }
+
+    let conn = Connection::open_with_flags(
+        &db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+
+    conn.execute_batch(
+        "PRAGMA cache_size = -32000;
+         PRAGMA temp_store = MEMORY;",
+    )?;
+
+    Ok(conn)
+}
+
+/// Handle headless CLI commands (--cli) before Tauri initializes.
+/// This runs before the single-instance plugin, so it works even when the GUI is already open.
+/// Returns true if a headless command was handled (caller should exit), false otherwise.
+fn handle_headless_cli(cli: &Cli) -> bool {
+    if let Some(ref cli_word) = cli.cli {
+        let conn = match open_database_standalone() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("{}", format!("Error: {}", e).red());
+                std::process::exit(1);
+            }
+        };
+
+        match db::lookup_word(&conn, cli_word) {
+            Ok(Some(detail)) => {
+                let pronun = if let Some(p) = detail.pronunciation {
+                    format!(" /{}/", p).truecolor(150, 150, 150)
+                } else {
+                    "".normal()
+                };
+                println!("\n{}{}", detail.word.bold().green(), pronun);
+
+                let mut current_pos = String::new();
+                for sense in detail.senses {
+                    if sense.pos != current_pos {
+                        current_pos = sense.pos.clone();
+                        let pos_label = match current_pos.as_str() {
+                            "n" => "NOUN",
+                            "v" => "VERB",
+                            "a" | "s" => "ADJECTIVE",
+                            "r" => "ADVERB",
+                            _ => &current_pos,
+                        };
+                        println!("\n  {}", pos_label.bold().blue());
+                    }
+                    println!(
+                        "    {}. {}",
+                        sense.sense_num.to_string().dimmed(),
+                        sense.definition
+                    );
+                    if !sense.examples.is_empty() {
+                        println!(
+                            "       \"{}\"",
+                            sense.examples[0].italic().truecolor(180, 180, 180)
+                        );
+                    }
+                }
+                println!();
+            }
+            Ok(None) => {
+                println!("{}", "Word not found in the database.".red());
+            }
+            Err(e) => {
+                eprintln!("{}", format!("Database error: {}", e).red());
+            }
+        }
+        return true;
+    }
+    false
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // ─── Headless CLI: runs BEFORE Tauri, bypasses single-instance ───
+    let cli = Cli::parse();
+    if handle_headless_cli(&cli) {
+        std::process::exit(0);
+    }
+    // Re-construct args without --cli for Tauri (it will re-parse in setup)
+    drop(cli);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
@@ -119,50 +220,9 @@ pub fn run() {
             // ─── Database ───────────────────────────────────────
             let conn = open_database(app)?;
 
-            // ─── Parse CLI Args ─────────────────────────────────
+            // ─── Parse CLI Args (GUI-only flags) ────────────────
+            // Note: --cli is already handled before Tauri init (see handle_headless_cli).
             let cli = Cli::parse();
-            if let Some(cli_word) = cli.cli {
-                if let Ok(Some(detail)) = db::lookup_word(&conn, &cli_word) {
-                    let pronun = if let Some(p) = detail.pronunciation {
-                        format!(" /{}/", p).truecolor(150, 150, 150)
-                    } else {
-                        "".normal()
-                    };
-                    println!("\n{}{}", detail.word.bold().green(), pronun);
-
-                    let mut current_pos = String::new();
-                    for sense in detail.senses {
-                        if sense.pos != current_pos {
-                            current_pos = sense.pos.clone();
-                            let pos_label = match current_pos.as_str() {
-                                "n" => "NOUN",
-                                "v" => "VERB",
-                                "a" | "s" => "ADJECTIVE",
-                                "r" => "ADVERB",
-                                _ => &current_pos,
-                            };
-                            println!("\n  {}", pos_label.bold().blue());
-                        }
-                        println!(
-                            "    {}. {}",
-                            sense.sense_num.to_string().dimmed(),
-                            sense.definition
-                        );
-                        if !sense.examples.is_empty() {
-                            println!(
-                                "       \"{}\"",
-                                sense.examples[0].italic().truecolor(180, 180, 180)
-                            );
-                        }
-                    }
-                    println!();
-                } else {
-                    println!("{}", "Word not found in the database.".red());
-                }
-                app.handle().exit(0);
-                return Ok(());
-            }
-
             let search_term = cli.search.or(cli.word);
             if let Some(word) = search_term {
                 let handle = app.handle().clone();
