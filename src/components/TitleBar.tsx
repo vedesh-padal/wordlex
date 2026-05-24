@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   Minus,
   Square,
@@ -8,6 +9,7 @@ import {
   BookOpen,
   Moon,
   Sun,
+  Info,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -58,6 +60,24 @@ export function TitleBar({
         localStorage.setItem("wordlex-theme", "light");
       }
       return next;
+    });
+  }, []);
+
+  const openAbout = useCallback(async () => {
+    const existing = await WebviewWindow.getByLabel("about");
+    if (existing) {
+      await existing.setFocus();
+      return;
+    }
+
+    new WebviewWindow("about", {
+      url: "/#about",
+      title: "About WordLex",
+      width: 400,
+      height: 500,
+      resizable: false,
+      decorations: true,
+      center: true
     });
   }, []);
 
@@ -112,6 +132,14 @@ export function TitleBar({
 
       {/* Right: Window controls */}
       <div className="titlebar-group">
+        <button
+          onClick={openAbout}
+          className="titlebar-btn"
+          title="About WordLex"
+          style={{ marginRight: "0.25rem" }}
+        >
+          <Info size={14} />
+        </button>
         <button
           onClick={toggleTheme}
           className="titlebar-btn"
