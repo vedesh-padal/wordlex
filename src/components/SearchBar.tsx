@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { Search, Loader2, X } from "lucide-react";
+import { Search, Loader2, X, History } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 
 import { POSBadge } from "./POSBadge";
 import type { SearchResult } from "../types";
@@ -23,6 +24,25 @@ export function SearchBar({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isOpen, setIsOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [recentHistory, setRecentHistory] = useState<string[]>([]);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const hist = await invoke<string[]>("get_history");
+      // Reverse to get latest first, and filter out empty, then take 15
+      const uniqueHist = Array.from(new Set(hist.filter(Boolean))).reverse();
+      setRecentHistory(uniqueHist.slice(0, 15));
+    } catch (e) {
+      console.error("Failed to fetch history:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isFocused && !value.trim()) {
+      fetchHistory();
+    }
+  }, [isFocused, value, fetchHistory]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -45,22 +65,31 @@ export function SearchBar({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const isShowingResults = isOpen && value.trim().length > 0 && results.length > 0;
+  const isShowingHistory = isFocused && !value.trim() && recentHistory.length > 0;
+  const isDropdownVisible = isShowingResults || isShowingHistory;
+  const currentListLength = isShowingResults ? results.length : isShowingHistory ? recentHistory.length : 0;
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // Always allow Esc to clear the search if dropdown is closed
       if (e.key === "Escape") {
         e.preventDefault();
-        if (isOpen) {
+        if (isDropdownVisible) {
           setIsOpen(false);
+          setIsFocused(false);
+          inputRef.current?.blur();
         } else {
           onChange("");
         }
         return;
       }
 
-      if (!isOpen) {
+      if (!isDropdownVisible) {
         if (e.key === "Enter" && value.trim()) {
           onSelect(value.trim());
+          setIsFocused(false);
+          inputRef.current?.blur();
         }
         return;
       }
@@ -69,7 +98,7 @@ export function SearchBar({
         case "ArrowDown":
           e.preventDefault();
           setSelectedIndex((prev) =>
-            prev < results.length - 1 ? prev + 1 : prev
+            prev < currentListLength - 1 ? prev + 1 : prev
           );
           break;
         case "ArrowUp":
@@ -78,17 +107,25 @@ export function SearchBar({
           break;
         case "Enter":
           e.preventDefault();
-          if (selectedIndex >= 0 && results[selectedIndex]) {
-            onSelect(results[selectedIndex].word);
+          if (selectedIndex >= 0) {
+            if (isShowingResults && results[selectedIndex]) {
+              onSelect(results[selectedIndex].word);
+            } else if (isShowingHistory && recentHistory[selectedIndex]) {
+              onSelect(recentHistory[selectedIndex]);
+            }
             setIsOpen(false);
+            setIsFocused(false);
+            inputRef.current?.blur();
           } else if (value.trim()) {
             onSelect(value.trim());
             setIsOpen(false);
+            setIsFocused(false);
+            inputRef.current?.blur();
           }
           break;
       }
     },
-    [isOpen, selectedIndex, results, value, onSelect, onChange]
+    [isDropdownVisible, selectedIndex, currentListLength, isShowingResults, isShowingHistory, results, recentHistory, value, onSelect, onChange]
   );
 
   useEffect(() => {
@@ -118,7 +155,8 @@ export function SearchBar({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => results.length > 0 && setIsOpen(true)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setTimeout(() => setIsFocused(false), 150)}
           placeholder="Search 150,000+ words..."
           spellCheck={false}
           autoComplete="off"
@@ -134,9 +172,9 @@ export function SearchBar({
         <kbd className="kbd-shortcut">Ctrl+L</kbd>
       </div>
 
-      {isOpen && results.length > 0 && (
+      {isDropdownVisible && (
         <div ref={dropdownRef} className="search-dropdown">
-          {results.map((result, i) => (
+          {isShowingResults && results.map((result, i) => (
             <button
               key={`${result.word}-${i}`}
               data-result-item
@@ -153,6 +191,21 @@ export function SearchBar({
                 ))}
               </div>
               <span className="result-def">{result.short_def}</span>
+            </button>
+          ))}
+
+          {isShowingHistory && recentHistory.map((word, i) => (
+            <button
+              key={`hist-${word}-${i}`}
+              data-result-item
+              onClick={() => {
+                onSelect(word);
+                setIsFocused(false);
+              }}
+              className={`search-result-item ${i === selectedIndex ? 'selected' : ''}`}
+            >
+              <History size={14} style={{ color: "var(--color-text-muted)", marginRight: "0.5rem" }} />
+              <span className="result-word" style={{ opacity: 0.8 }}>{word}</span>
             </button>
           ))}
         </div>
