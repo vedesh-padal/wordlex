@@ -119,7 +119,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&open_item, &wotd_item, &quit_item])?;
             app.manage(menu.clone());
 
-            let tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::new()
                 .tooltip("WordLex")
                 .icon(app.default_window_icon().unwrap().clone())
                 .on_menu_event(move |app, event| match event.id.as_ref() {

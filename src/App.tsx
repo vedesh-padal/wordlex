@@ -141,6 +141,11 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleGoBack, handleGoForward]);
 
+  const handleGoHome = useCallback(() => {
+    search.setQuery("");
+    detail.clear();
+  }, [search, detail]);
+
   return (
     <div className="app-container">
       <TitleBar
@@ -148,6 +153,7 @@ export default function App() {
         canGoForward={history.canGoForward}
         onGoBack={handleGoBack}
         onGoForward={handleGoForward}
+        onHome={handleGoHome}
       />
 
       <SearchBar

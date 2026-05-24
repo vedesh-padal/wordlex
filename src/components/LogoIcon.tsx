@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const LogoIcon = ({ size = 24, className = '', color = 'currentColor' }: { size?: number, className?: string, color?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

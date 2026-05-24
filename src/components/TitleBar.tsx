@@ -20,6 +20,7 @@ interface TitleBarProps {
   canGoForward: boolean;
   onGoBack: () => void;
   onGoForward: () => void;
+  onHome: () => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export function TitleBar({
   canGoForward,
   onGoBack,
   onGoForward,
+  onHome,
 }: TitleBarProps) {
   const appWindow = getCurrentWindow();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -110,7 +112,12 @@ export function TitleBar({
     <div data-tauri-drag-region className="titlebar">
       {/* Left: Logo */}
       <div className="titlebar-group" data-tauri-drag-region>
-        <div className="titlebar-brand" style={{ pointerEvents: "none" }}>
+        <div 
+          className="titlebar-brand" 
+          onClick={onHome}
+          style={{ cursor: "pointer" }}
+          title="Go to Home"
+        >
           <LogoIcon size={16} color="var(--color-ring)" />
           <span>WordLex</span>
         </div>
