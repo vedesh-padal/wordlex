@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex};
 use commands::{DbState, HistoryState};
 use rusqlite::Connection;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Emitter, Manager,
+    Emitter, Manager, Listener,
 };
 
 /// Opens the SQLite database from the bundled resources directory.
@@ -106,18 +106,22 @@ pub fn run() {
             });
 
             // ─── System Tray ────────────────────────────────────
-            let open_item = MenuItem::with_id(app, "open", "Open WordLex", true, None::<&str>)?;
-            let wotd_item =
-                MenuItem::with_id(app, "wotd", "Word of the Day", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let open_item = MenuItemBuilder::with_id("open", "Open WordLex")
+                .accelerator("CmdOrCtrl+O")
+                .build(app)?;
+            let wotd_item = MenuItemBuilder::with_id("wotd", "Word of the Day")
+                .accelerator("CmdOrCtrl+D")
+                .build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit")
+                .accelerator("CmdOrCtrl+Q")
+                .build(app)?;
 
             let menu = Menu::with_items(app, &[&open_item, &wotd_item, &quit_item])?;
+            app.manage(menu.clone());
 
-            let _tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
                 .tooltip("WordLex")
-                .title("WordLex")
                 .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "open" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -148,6 +152,12 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // ─── Event listener for UI quit ──────────────
+            let app_handle = app.handle().clone();
+            app.listen("quit-app", move |_| {
+                app_handle.exit(0);
+            });
+
             // ─── Window: hide on close instead of quitting ──────
             if let Some(window) = app.get_webview_window("main") {
                 let win = window.clone();
@@ -166,6 +176,7 @@ pub fn run() {
             commands::lookup_word,
             commands::get_random_word,
             commands::get_history,
+            commands::quit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running WordLex");

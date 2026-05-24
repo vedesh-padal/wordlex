@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   Minus,
@@ -9,6 +10,7 @@ import {
   Moon,
   Sun,
   Info,
+  Power
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LogoIcon } from "./LogoIcon";
@@ -96,6 +98,10 @@ export function TitleBar({
     }
   }, [appWindow]);
 
+  const handleQuit = useCallback(() => {
+    invoke("quit_app");
+  }, []);
+
   const handleClose = useCallback(() => {
     appWindow.close();
   }, [appWindow]);
@@ -147,6 +153,13 @@ export function TitleBar({
           style={{ marginRight: "0.5rem" }}
         >
           {isDark ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
+        <button
+          onClick={handleQuit}
+          className="titlebar-btn"
+          title="Quit WordLex"
+        >
+          <Power size={14} />
         </button>
         <button
           onClick={handleMinimize}

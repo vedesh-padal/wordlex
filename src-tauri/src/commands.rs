@@ -73,3 +73,8 @@ pub async fn get_history(
     let hist = history.0.lock().map_err(|e| e.to_string())?;
     Ok(hist.clone())
 }
+
+#[tauri::command]
+pub fn quit_app() {
+    std::process::exit(0);
+}
