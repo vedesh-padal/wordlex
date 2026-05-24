@@ -1,6 +1,6 @@
 [package]
 name = "wordlex"
-version = "1.0.0"
+version = "1.5.0"
 description = "A native Linux dictionary and thesaurus powered by Open English WordNet"
 authors = ["Vedesh Padal <https://github.com/vedesh-padal>"]
 edition = "2021"
