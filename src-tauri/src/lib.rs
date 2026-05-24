@@ -176,6 +176,7 @@ pub fn run() {
             commands::lookup_word,
             commands::get_random_word,
             commands::get_history,
+            commands::clear_history,
             commands::quit_app,
         ])
         .run(tauri::generate_context!())

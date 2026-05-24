@@ -10,7 +10,8 @@ import {
   Moon,
   Sun,
   Info,
-  Power
+  Power,
+  Settings
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LogoIcon } from "./LogoIcon";
@@ -21,6 +22,7 @@ interface TitleBarProps {
   onGoBack: () => void;
   onGoForward: () => void;
   onHome: () => void;
+  onOpenSettings: () => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function TitleBar({
   onGoBack,
   onGoForward,
   onHome,
+  onOpenSettings,
 }: TitleBarProps) {
   const appWindow = getCurrentWindow();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -145,6 +148,14 @@ export function TitleBar({
 
       {/* Right: Window controls */}
       <div className="titlebar-group">
+        <button
+          onClick={onOpenSettings}
+          className="titlebar-btn"
+          title="Settings"
+          style={{ marginRight: "0.25rem" }}
+        >
+          <Settings size={14} />
+        </button>
         <button
           onClick={openAbout}
           className="titlebar-btn"

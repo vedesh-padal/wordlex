@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 import { TitleBar } from "./components/TitleBar";
@@ -6,6 +6,7 @@ import { SearchBar } from "./components/SearchBar";
 import { WordDetailView } from "./components/WordDetail";
 import { EmptyState } from "./components/EmptyState";
 import { LoadingSkeleton } from "./components/LoadingSkeleton";
+import { SettingsModal } from "./components/SettingsModal";
 
 import { useWordSearch } from "./hooks/useWordSearch";
 import { useWordDetail } from "./hooks/useWordDetail";
@@ -25,6 +26,8 @@ export default function App() {
   const search = useWordSearch();
   const detail = useWordDetail();
   const history = useHistory();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [globalShortcut, setGlobalShortcut] = useState("Alt+W");
 
   // Handle word selection from search or cross-reference clicks
   const handleWordSelect = useCallback(
@@ -70,27 +73,29 @@ export default function App() {
     const setupShortcut = async () => {
       try {
         await unregisterAll();
-        await register("Alt+W", async (event) => {
-          if (event.state === "Pressed") {
-            const window = getCurrentWindow();
-            await window.show();
-            await window.setFocus();
+        if (globalShortcut) {
+          await register(globalShortcut, async (event) => {
+            if (event.state === "Pressed") {
+              const window = getCurrentWindow();
+              await window.show();
+              await window.setFocus();
 
-            try {
-              const clipText = await readText();
-              if (clipText && clipText.trim().length > 0 && clipText.trim().length < 30) {
-                // If it's a single word or short phrase, auto-search
-                const sanitized = clipText.trim();
-                search.setQuery(sanitized);
-                detail.lookup(sanitized);
-                history.push(sanitized);
+              try {
+                const clipText = await readText();
+                if (clipText && clipText.trim().length > 0 && clipText.trim().length < 30) {
+                  // If it's a single word or short phrase, auto-search
+                  const sanitized = clipText.trim();
+                  search.setQuery(sanitized);
+                  detail.lookup(sanitized);
+                  history.push(sanitized);
+                }
+              } catch (err) {
+                console.warn("Failed to read clipboard:", err);
               }
-            } catch (err) {
-              console.warn("Failed to read clipboard:", err);
             }
-          }
-        });
-        isRegistered = true;
+          });
+          isRegistered = true;
+        }
       } catch (err) {
         console.error("Failed to register shortcut:", err);
       }
@@ -103,7 +108,7 @@ export default function App() {
         unregisterAll().catch(console.error);
       }
     };
-  }, [search, detail, history]);
+  }, [search, detail, history, globalShortcut]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -154,6 +159,7 @@ export default function App() {
         onGoBack={handleGoBack}
         onGoForward={handleGoForward}
         onHome={handleGoHome}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       <SearchBar
@@ -178,6 +184,16 @@ export default function App() {
           <EmptyState />
         )}
       </div>
+
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        currentShortcut={globalShortcut}
+        onShortcutChange={setGlobalShortcut}
+        onClearHistory={() => {
+          history.clear();
+        }}
+      />
     </div>
   );
 }

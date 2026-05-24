@@ -41,8 +41,13 @@ export function useHistory() {
     return stack[newIndex] ?? null;
   }, [index, stack]);
 
+  const clear = useCallback(() => {
+    setStack([]);
+    setIndex(-1);
+  }, []);
+
   const canGoBack = index > 0;
   const canGoForward = index < stack.length - 1;
 
-  return { stack, index, push, goBack, goForward, canGoBack, canGoForward };
+  return { stack, index, push, goBack, goForward, canGoBack, canGoForward, clear };
 }

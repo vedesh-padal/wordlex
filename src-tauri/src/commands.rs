@@ -75,6 +75,15 @@ pub async fn get_history(
 }
 
 #[tauri::command]
+pub async fn clear_history(
+    history: State<'_, HistoryState>,
+) -> Result<(), String> {
+    let mut hist = history.0.lock().map_err(|e| e.to_string())?;
+    hist.clear();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn quit_app() {
     std::process::exit(0);
 }
