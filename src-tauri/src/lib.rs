@@ -106,10 +106,10 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
 /// without requiring a running Tauri App instance.
 /// This is used by headless CLI commands that must work even when the GUI is already running.
 fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> {
-    // Tauri stores the DB under ~/.local/share/com.wordlex.app/oewn.db
+    // Tauri stores the DB under ~/.local/share/com.wordlex.desktop/oewn.db
     let app_data_dir = dirs::data_dir()
         .ok_or("Could not determine XDG data directory")?
-        .join("com.wordlex.app");
+        .join("com.wordlex.desktop");
 
     let db_path = app_data_dir.join("oewn.db");
 
@@ -199,7 +199,7 @@ fn handle_headless_cli(cli: &Cli) -> bool {
         let conn = match open_database_standalone() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!(r#"{{"error":"{}"}}", e);
+                eprintln!(r#"{{"error":"{}"}}"#, e);
                 std::process::exit(1);
             }
         };
@@ -211,7 +211,7 @@ fn handle_headless_cli(cli: &Cli) -> bool {
                 println!("null");
             }
             Err(e) => {
-                eprintln!(r#"{{"error":"{}"}}", e);
+                eprintln!(r#"{{"error":"{}"}}"#, e);
                 std::process::exit(1);
             }
         }
@@ -223,7 +223,7 @@ fn handle_headless_cli(cli: &Cli) -> bool {
         let conn = match open_database_standalone() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!(r#"{{"error":"{}"}}", e);
+                eprintln!(r#"{{"error":"{}"}}"#, e);
                 std::process::exit(1);
             }
         };
@@ -232,7 +232,7 @@ fn handle_headless_cli(cli: &Cli) -> bool {
                 println!("{}", serde_json::to_string(&results).unwrap_or_default());
             }
             Err(e) => {
-                eprintln!(r#"{{"error":"{}"}}", e);
+                eprintln!(r#"{{"error":"{}"}}"#, e);
                 std::process::exit(1);
             }
         }
