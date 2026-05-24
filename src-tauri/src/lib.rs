@@ -19,7 +19,7 @@ use tauri::{
 #[command(
     name = "wordlex",
     about = "WordLex: A lightning-fast native Linux dictionary and thesaurus.",
-    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)",
+    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --cli-json hello   (Outputs full definition as JSON)\n  wordlex --search-json eph  (Outputs prefix search results as JSON)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)",
     version
 )]
 struct Cli {
@@ -29,6 +29,14 @@ struct Cli {
     /// Headless mode: search the SQLite database and print the fully formatted definition to the terminal.
     #[arg(long)]
     pub cli: Option<String>,
+
+    /// Headless mode: output the full word detail as raw JSON to stdout (for tooling integrations).
+    #[arg(long)]
+    pub cli_json: Option<String>,
+
+    /// Headless mode: output prefix search results as a JSON array to stdout (for tooling integrations).
+    #[arg(long)]
+    pub search_json: Option<String>,
 
     /// Read the system clipboard and search for its contents in the GUI (Bypasses Wayland hotkey restrictions).
     #[arg(long, default_value_t = false)]
@@ -126,10 +134,11 @@ fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> 
     Ok(conn)
 }
 
-/// Handle headless CLI commands (--cli) before Tauri initializes.
+/// Handle headless CLI commands (--cli, --cli-json, --search-json) before Tauri initializes.
 /// This runs before the single-instance plugin, so it works even when the GUI is already open.
 /// Returns true if a headless command was handled (caller should exit), false otherwise.
 fn handle_headless_cli(cli: &Cli) -> bool {
+    // ─── --cli: colored terminal output ──────────────────────
     if let Some(ref cli_word) = cli.cli {
         let conn = match open_database_standalone() {
             Ok(c) => c,
@@ -184,6 +193,52 @@ fn handle_headless_cli(cli: &Cli) -> bool {
         }
         return true;
     }
+
+    // ─── --cli-json: raw JSON output of a full word lookup ───
+    if let Some(ref word) = cli.cli_json {
+        let conn = match open_database_standalone() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!(r#"{{"error":"{}"}}", e);
+                std::process::exit(1);
+            }
+        };
+        match db::lookup_word(&conn, word) {
+            Ok(Some(detail)) => {
+                println!("{}", serde_json::to_string(&detail).unwrap_or_default());
+            }
+            Ok(None) => {
+                println!("null");
+            }
+            Err(e) => {
+                eprintln!(r#"{{"error":"{}"}}", e);
+                std::process::exit(1);
+            }
+        }
+        return true;
+    }
+
+    // ─── --search-json: raw JSON output of prefix search ────
+    if let Some(ref prefix) = cli.search_json {
+        let conn = match open_database_standalone() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!(r#"{{"error":"{}"}}", e);
+                std::process::exit(1);
+            }
+        };
+        match db::search_words(&conn, prefix, 50) {
+            Ok(results) => {
+                println!("{}", serde_json::to_string(&results).unwrap_or_default());
+            }
+            Err(e) => {
+                eprintln!(r#"{{"error":"{}"}}", e);
+                std::process::exit(1);
+            }
+        }
+        return true;
+    }
+
     false
 }
 
