@@ -3,7 +3,6 @@
 WordLex is a blisteringly fast, beautifully designed native Linux dictionary and thesaurus. Powered by the incredibly comprehensive Open English WordNet database, WordLex provides instant, 100% offline word lookups right at your fingertips.
 
 ![WordLex Screenshot](docs/screenshot.png)
-*(Note for Vedesh: Place your beautiful UI screenshot image at `docs/screenshot.png` to have it render here!)*
 
 ## 🌟 Key Features
 
@@ -17,7 +16,9 @@ WordLex is a blisteringly fast, beautifully designed native Linux dictionary and
 ## 🚀 Installation & Setup
 
 ### For Regular Users (Ubuntu / Debian / Linux Mint)
+
 The easiest way to install WordLex is to use the pre-built `.deb` package.
+
 1. Go to the [Releases Page](../../releases) on GitHub.
 2. Download the latest `wordlex-v1.0.0_amd64.deb` file.
 3. Open your terminal and install it:
@@ -27,16 +28,19 @@ The easiest way to install WordLex is to use the pre-built `.deb` package.
 4. You will now find **WordLex** in your application launcher!
 
 ### For Developers (Build from Source)
+
 If you want to run WordLex from source or contribute to development:
 
 **Prerequisites:**
 You need Node.js (v20+ recommended) and the Rust toolchain installed. You also need the system dependencies required by Tauri on Linux:
+
 ```bash
 sudo apt update
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
 ```
 
 **Build Steps:**
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/vedesh-padal/wordlex.git
