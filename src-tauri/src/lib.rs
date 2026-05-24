@@ -10,7 +10,7 @@ use rusqlite::Connection;
 use tauri::{
     menu::{Menu, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Emitter, Manager, Listener,
+    Emitter, Listener, Manager,
 };
 
 /// Opens the SQLite database from the bundled resources directory.
@@ -38,8 +38,7 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
 
     let conn = Connection::open_with_flags(
         &resource_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
-            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
     // Performance pragmas for read-heavy workload
@@ -78,11 +77,8 @@ pub fn run() {
                 // contend with the HTTP server's Arc<Mutex<Connection>>.
                 // Both are read-only so no write contention.
                 {
-                    let resource_path = app
-                        .path()
-                        .resource_dir()?
-                        .join("resources")
-                        .join("oewn.db");
+                    let resource_path =
+                        app.path().resource_dir()?.join("resources").join("oewn.db");
 
                     let conn2 = Connection::open_with_flags(
                         &resource_path,

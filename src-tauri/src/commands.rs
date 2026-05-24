@@ -58,26 +58,20 @@ pub async fn lookup_word(
 /// Returns a random interesting word with full detail.
 /// Used for "Word of the Day" feature.
 #[tauri::command]
-pub async fn get_random_word(
-    state: State<'_, DbState>,
-) -> Result<Option<WordDetail>, String> {
+pub async fn get_random_word(state: State<'_, DbState>) -> Result<Option<WordDetail>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     db::get_random_word(&conn).map_err(|e| e.to_string())
 }
 
 /// Returns the last N looked-up words (most recent first).
 #[tauri::command]
-pub async fn get_history(
-    history: State<'_, HistoryState>,
-) -> Result<Vec<String>, String> {
+pub async fn get_history(history: State<'_, HistoryState>) -> Result<Vec<String>, String> {
     let hist = history.0.lock().map_err(|e| e.to_string())?;
     Ok(hist.clone())
 }
 
 #[tauri::command]
-pub async fn clear_history(
-    history: State<'_, HistoryState>,
-) -> Result<(), String> {
+pub async fn clear_history(history: State<'_, HistoryState>) -> Result<(), String> {
     let mut hist = history.0.lock().map_err(|e| e.to_string())?;
     hist.clear();
     Ok(())

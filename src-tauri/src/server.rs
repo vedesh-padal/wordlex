@@ -75,9 +75,12 @@ async fn handle_search(
     let query = params.q.unwrap_or_default();
     let limit = params.limit.unwrap_or(30).min(100);
 
-    let conn = state.db.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let results = db::search_words(&conn, &query, limit)
+    let conn = state
+        .db
+        .lock()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let results =
+        db::search_words(&conn, &query, limit).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(results))
 }
@@ -88,9 +91,11 @@ async fn handle_lookup(
 ) -> Result<Json<WordDetail>, StatusCode> {
     let word = params.word.ok_or(StatusCode::BAD_REQUEST)?;
 
-    let conn = state.db.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let result = db::lookup_word(&conn, &word)
+    let conn = state
+        .db
+        .lock()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let result = db::lookup_word(&conn, &word).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match result {
         Some(detail) => Ok(Json(detail)),
@@ -101,9 +106,11 @@ async fn handle_lookup(
 async fn handle_random(
     AxumState(state): AxumState<AppState>,
 ) -> Result<Json<WordDetail>, StatusCode> {
-    let conn = state.db.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let result = db::get_random_word(&conn)
+    let conn = state
+        .db
+        .lock()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let result = db::get_random_word(&conn).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match result {
         Some(detail) => Ok(Json(detail)),

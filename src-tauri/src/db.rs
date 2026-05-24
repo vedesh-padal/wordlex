@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, Result};
 use std::collections::HashMap;
 
 use crate::models::{SearchResult, WordDetail, WordSense};
@@ -43,11 +43,7 @@ pub fn setup_fts(conn: &Connection) -> Result<()> {
 ///
 /// Returns at most `limit` results, each containing the word, all its POS values,
 /// and the first definition as a preview.
-pub fn search_words(
-    conn: &Connection,
-    query: &str,
-    limit: usize,
-) -> Result<Vec<SearchResult>> {
+pub fn search_words(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SearchResult>> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(vec![]);
@@ -94,14 +90,10 @@ pub fn search_words(
 }
 
 /// Fallback search using LIKE when FTS5 doesn't return results.
-fn search_words_like(
-    conn: &Connection,
-    query: &str,
-    limit: usize,
-) -> Result<Vec<SearchResult>> {
+fn search_words_like(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SearchResult>> {
     let lower_query = query.to_lowercase();
     let has_wildcards = lower_query.contains('*') || lower_query.contains('?');
-    
+
     // If the user uses explicit wildcards, replace them with SQL wildcards.
     // Otherwise, default to prefix matching.
     let pattern = if has_wildcards {
@@ -210,15 +202,17 @@ pub fn lookup_word(conn: &Connection, word_query: &str) -> Result<Option<WordDet
     )?;
 
     // Get pronunciation (if any)
-    let pronunciation: Option<String> = conn.query_row(
-        "SELECT p.pronunciation 
+    let pronunciation: Option<String> = conn
+        .query_row(
+            "SELECT p.pronunciation 
          FROM lexes_pronunciations lp
          JOIN pronunciations p ON p.pronunciationid = lp.pronunciationid
          WHERE lp.wordid = ?1
          LIMIT 1",
-        params![wordid],
-        |row| row.get(0),
-    ).optional()?;
+            params![wordid],
+            |row| row.get(0),
+        )
+        .optional()?;
 
     // Get all senses with definitions, POS, and sense ordering
     let mut sense_stmt = conn.prepare(
@@ -307,8 +301,16 @@ pub fn lookup_word(conn: &Connection, word_query: &str) -> Result<Option<WordDet
 
     let hypernyms = get_related_words_in(conn, &synset_ids, &[REL_HYPERNYM])?;
     let hyponyms = get_related_words_in(conn, &synset_ids, &[REL_HYPONYM])?;
-    let meronyms = get_related_words_in(conn, &synset_ids, &[REL_MERONYM_PART, REL_MERONYM_MEMBER, REL_MERONYM_SUB])?;
-    let holonyms = get_related_words_in(conn, &synset_ids, &[REL_HOLONYM_PART, REL_HOLONYM_MEMBER, REL_HOLONYM_SUB])?;
+    let meronyms = get_related_words_in(
+        conn,
+        &synset_ids,
+        &[REL_MERONYM_PART, REL_MERONYM_MEMBER, REL_MERONYM_SUB],
+    )?;
+    let holonyms = get_related_words_in(
+        conn,
+        &synset_ids,
+        &[REL_HOLONYM_PART, REL_HOLONYM_MEMBER, REL_HOLONYM_SUB],
+    )?;
 
     // Derived forms via lexrelations
     let mut deriv_stmt = conn.prepare(
@@ -347,7 +349,11 @@ fn get_related_words_in(
 
     let mut words_map: HashMap<String, ()> = HashMap::new();
 
-    let rel_placeholders = relation_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let rel_placeholders = relation_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
     let query = format!(
         "SELECT DISTINCT w2.word
          FROM semrelations sr
@@ -360,7 +366,7 @@ fn get_related_words_in(
 
     for synset_id in synset_ids {
         let mut stmt = conn.prepare(&query)?;
-        
+
         let mut params_vec: Vec<&dyn rusqlite::ToSql> = vec![synset_id];
         for rel in relation_ids {
             params_vec.push(rel);
