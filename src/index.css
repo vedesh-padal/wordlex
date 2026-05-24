@@ -5,14 +5,16 @@
 
 :root {
   /* LIGHT THEME (Default) */
-  --color-bg-base: #f0f2f5;
+  --color-bg-base: #f8fafc;
   --color-surface: rgba(255, 255, 255, 0.7);
-  --color-surface-active: rgba(255, 255, 255, 0.9);
+  --color-surface-active: rgba(241, 245, 249, 0.9);
+  --color-surface-hover: rgba(241, 245, 249, 0.8);
   --color-border: rgba(0, 0, 0, 0.1);
   --color-border-subtle: rgba(0, 0, 0, 0.05);
   
-  --color-text: #111827;
-  --color-text-muted: #6b7280;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
   
   --color-ring: rgba(59, 130, 246, 0.5);
 
@@ -33,45 +35,56 @@
   --color-r-text: #7c3aed;
 
   --app-bg-gradient: radial-gradient(circle at top left, #e0e7ff 0%, #f3f4f6 100%);
+  --title-gradient: linear-gradient(135deg, #0f172a 0%, #475569 100%);
   --surface-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --inset-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --dropdown-bg: rgba(255, 255, 255, 0.85);
+  --search-focus-bg: rgba(255, 255, 255, 0.9);
   
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --glass-blur: blur(16px);
+  --glass-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 :root.dark {
   /* DARK THEME */
-  --color-bg-base: #0f172a;
-  --color-surface: rgba(30, 41, 59, 0.6);
-  --color-surface-active: rgba(51, 65, 85, 0.7);
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-bg-base: #030712;
+  --color-surface: rgba(17, 24, 39, 0.65);
+  --color-surface-active: rgba(55, 65, 81, 0.9);
+  --color-surface-hover: rgba(31, 41, 55, 0.8);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
   
-  --color-text: #f8fafc;
-  --color-text-muted: #94a3b8;
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
   
-  --color-ring: rgba(56, 189, 248, 0.5);
+  --color-ring: rgba(99, 102, 241, 0.5);
 
   /* POS Badge Colors - Dark Mode */
-  --color-n-bg: rgba(56, 189, 248, 0.15);
-  --color-n-text: #38bdf8;
+  --color-n-bg: rgba(59, 130, 246, 0.15);
+  --color-n-text: #60a5fa;
   
-  --color-v-bg: rgba(52, 211, 153, 0.15);
+  --color-v-bg: rgba(16, 185, 129, 0.15);
   --color-v-text: #34d399;
   
-  --color-a-bg: rgba(251, 191, 36, 0.15);
+  --color-a-bg: rgba(245, 158, 11, 0.15);
   --color-a-text: #fbbf24;
   
-  --color-s-bg: rgba(251, 191, 36, 0.15);
+  --color-s-bg: rgba(245, 158, 11, 0.15);
   --color-s-text: #fbbf24;
   
-  --color-r-bg: rgba(167, 139, 250, 0.15);
-  --color-r-text: #a78bfa;
+  --color-r-bg: rgba(168, 85, 247, 0.15);
+  --color-r-text: #c084fc;
 
-  --app-bg-gradient: radial-gradient(circle at top left, #1e293b 0%, #0f172a 100%);
+  --app-bg-gradient: radial-gradient(circle at top right, #1e1b4b, #030712 60%);
+  --title-gradient: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
   --surface-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
   --inset-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --dropdown-bg: rgba(17, 24, 39, 0.85);
+  --search-focus-bg: rgba(17, 24, 39, 0.8);
+  
+  --glass-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
   /* Reset & Base */
@@ -112,11 +125,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--color-border);
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--color-border-subtle);
   }
   
   /* Focus */
@@ -148,7 +161,7 @@
     justify-content: space-between;
     height: 2.75rem;
     padding: 0 0.75rem;
-    background: rgba(3, 7, 18, 0.4);
+    background: var(--color-surface);
     backdrop-filter: var(--glass-blur);
     border-bottom: 1px solid var(--color-border);
     user-select: none;
@@ -218,7 +231,7 @@
   .search-input-wrapper:focus-within {
     border-color: var(--color-ring);
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), var(--glass-shadow);
-    background: rgba(17, 24, 39, 0.8);
+    background: var(--search-focus-bg);
   }
   
   .search-input {
@@ -244,7 +257,7 @@
     font-size: 0.65rem;
     font-weight: 600;
     color: var(--color-text-muted);
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(128, 128, 128, 0.1);
     border: 1px solid var(--color-border);
     border-radius: 4px;
     letter-spacing: 0.05em;
@@ -256,11 +269,11 @@
     top: calc(100% - 0.5rem);
     left: 1.5rem;
     right: 1.5rem;
-    background: rgba(17, 24, 39, 0.85);
+    background: var(--dropdown-bg);
     backdrop-filter: blur(24px);
     border: 1px solid var(--color-border);
     border-radius: 12px;
-    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     max-height: 20rem;
     overflow-y: auto;
     z-index: 50;
@@ -276,6 +289,7 @@
     border-bottom: 1px solid var(--color-border-subtle);
     text-align: left;
     transition: background 0.1s;
+    color: var(--color-text-primary);
   }
   .search-result-item:last-child {
     border-bottom: none;
@@ -311,7 +325,7 @@
     font-size: 2.5rem;
     font-weight: 800;
     letter-spacing: -0.03em;
-    background: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
+    background: var(--title-gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     line-height: 1.1;
