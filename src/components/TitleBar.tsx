@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -27,10 +29,37 @@ export function TitleBar({
 }: TitleBarProps) {
   const appWindow = getCurrentWindow();
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
     appWindow.isMaximized().then(setIsMaximized).catch(() => {});
+    
+    // Initialize theme
+    const saved = localStorage.getItem("wordlex-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const initialDark = saved ? saved === "dark" : prefersDark;
+    
+    setIsDark(initialDark);
+    if (initialDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   }, [appWindow]);
+
+  const toggleTheme = useCallback(() => {
+    setIsDark((prev) => {
+      const next = !prev;
+      if (next) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("wordlex-theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("wordlex-theme", "light");
+      }
+      return next;
+    });
+  }, []);
 
   const handleMinimize = useCallback(() => {
     appWindow.minimize();
@@ -83,6 +112,14 @@ export function TitleBar({
 
       {/* Right: Window controls */}
       <div className="titlebar-group">
+        <button
+          onClick={toggleTheme}
+          className="titlebar-btn"
+          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          style={{ marginRight: "0.5rem" }}
+        >
+          {isDark ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
         <button
           onClick={handleMinimize}
           className="titlebar-btn"
