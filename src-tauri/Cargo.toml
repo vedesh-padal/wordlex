@@ -7,6 +7,10 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/vedesh-padal/wordlex"
 
+[[bin]]
+name = "WordLex"
+path = "src/main.rs"
+
 [lib]
 name = "wordlex_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
