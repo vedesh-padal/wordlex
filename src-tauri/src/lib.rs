@@ -12,6 +12,27 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Listener, Manager,
 };
+use clap::Parser;
+use colored::*;
+
+#[derive(Parser, Debug)]
+#[command(name = "wordlex", about = "Native Linux dictionary and thesaurus", version)]
+struct Cli {
+    /// Open WordLex and instantly search this word
+    pub word: Option<String>,
+
+    /// Headless mode: search the database and print the definition to the terminal
+    #[arg(long)]
+    pub cli: Option<String>,
+
+    /// Open WordLex and search the current clipboard contents
+    #[arg(long, default_value_t = false)]
+    pub from_clipboard: bool,
+
+    /// Open WordLex and instantly search this word
+    #[arg(short, long)]
+    pub search: Option<String>,
+}
 
 /// Opens the SQLite database from the bundled resources directory.
 ///
@@ -74,15 +95,77 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
+
+                if let Ok(cli) = Cli::try_parse_from(args) {
+                    let search_term = cli.search.or(cli.word);
+                    if let Some(word) = search_term {
+                        let _ = window.emit("search-word", word);
+                    } else if cli.from_clipboard {
+                        let _ = window.emit("search-clipboard", ());
+                    }
+                }
             }
         }))
         .setup(|app| {
             // ─── Database ───────────────────────────────────────
             let conn = open_database(app)?;
+
+            // ─── Parse CLI Args ─────────────────────────────────
+            let cli = Cli::parse();
+            if let Some(cli_word) = cli.cli {
+                if let Ok(Some(detail)) = db::lookup_word(&conn, &cli_word) {
+                    let pronun = if let Some(p) = detail.pronunciation {
+                        format!(" /{}/", p).truecolor(150, 150, 150)
+                    } else {
+                        "".normal()
+                    };
+                    println!("\n{}{}", detail.word.bold().green(), pronun);
+                    
+                    let mut current_pos = String::new();
+                    for sense in detail.senses {
+                        if sense.pos != current_pos {
+                            current_pos = sense.pos.clone();
+                            let pos_label = match current_pos.as_str() {
+                                "n" => "NOUN",
+                                "v" => "VERB",
+                                "a" | "s" => "ADJECTIVE",
+                                "r" => "ADVERB",
+                                _ => &current_pos,
+                            };
+                            println!("\n  {}", pos_label.bold().blue());
+                        }
+                        println!("    {}. {}", sense.sense_num.to_string().dimmed(), sense.definition);
+                        if !sense.examples.is_empty() {
+                            println!("       \"{}\"", sense.examples[0].italic().truecolor(180, 180, 180));
+                        }
+                    }
+                    println!();
+                } else {
+                    println!("{}", "Word not found in the database.".red());
+                }
+                app.handle().exit(0);
+                return Ok(());
+            }
+
+            let search_term = cli.search.or(cli.word);
+            if let Some(word) = search_term {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let _ = handle.emit("search-word", word);
+                });
+            } else if cli.from_clipboard {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let _ = handle.emit("search-clipboard", ());
+                });
+            }
+
             let conn_arc = Arc::new(Mutex::new(conn));
 
             // Register Tauri managed state

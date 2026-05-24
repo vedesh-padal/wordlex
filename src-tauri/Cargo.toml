@@ -31,3 +31,5 @@ axum = { version = "0.7", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors"] }
 log = "0.4"
+clap = { version = "4", features = ["derive"] }
+colored = "2"

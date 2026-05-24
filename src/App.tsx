@@ -66,6 +66,37 @@ export default function App() {
     };
   }, [detail]);
 
+  // Listen for CLI arguments (search-word and search-clipboard)
+  useEffect(() => {
+    const unlistenWord = listen<string>("search-word", (event) => {
+      const sanitized = event.payload.trim();
+      search.setQuery(sanitized);
+      detail.lookup(sanitized);
+      history.push(sanitized);
+    });
+    
+    const unlistenClipboard = listen("search-clipboard", async () => {
+      try {
+        const clipText = await readText();
+        if (clipText && clipText.trim().length > 0 && clipText.trim().length < 30) {
+          if (!clipText.trim().includes(" ")) {
+            const sanitized = clipText.trim();
+            search.setQuery(sanitized);
+            detail.lookup(sanitized);
+            history.push(sanitized);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to read clipboard:", err);
+      }
+    });
+
+    return () => {
+      unlistenWord.then((fn) => fn());
+      unlistenClipboard.then((fn) => fn());
+    };
+  }, [search, detail, history]);
+
   // Global hotkey & quick lookup
   useEffect(() => {
     let isRegistered = false;
