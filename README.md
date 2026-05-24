@@ -10,17 +10,33 @@ WordLex is a blisteringly fast, beautifully designed native Linux dictionary and
 - **100% Offline & Instant:** The entire 150,000+ word database runs locally on your machine. Zero loading times, zero internet required.
 - **Global Shortcut:** Summon WordLex from anywhere on your desktop by pressing `Alt+W` (configurable in settings!).
 - **Rich Word Data:** View parts of speech, synonyms, antonyms, examples, and phonetic pronunciations effortlessly.
-- **Smart Clipboard Integration:** Highlight any word in any app, press `Alt+W`, and WordLex will automatically open and instantly define the word you highlighted.
+- **Smart Clipboard Integration:** Copy any word to your clipboard (`Ctrl+C`), press `Alt+W`, and WordLex will automatically open and instantly define the word.
 - **Modern Minimalist UI:** Built with React, Vite, and Tauri, featuring a beautiful glassmorphic dark-mode interface.
 - **Type-Ahead Search:** Lightning-fast prefix searching powered by an optimized SQLite Full-Text Search (FTS5) index.
 
 ## 🚀 Installation & Setup
 
+### For Regular Users (Ubuntu / Debian / Linux Mint)
+The easiest way to install WordLex is to use the pre-built `.deb` package.
+1. Go to the [Releases Page](../../releases) on GitHub.
+2. Download the latest `wordlex-v1.0.0_amd64.deb` file.
+3. Open your terminal and install it:
+   ```bash
+   sudo apt install ./wordlex-v1.0.0_amd64.deb
+   ```
+4. You will now find **WordLex** in your application launcher!
+
+### For Developers (Build from Source)
 If you want to run WordLex from source or contribute to development:
 
-### Prerequisites
-You need Node.js (v18+) and the Rust toolchain installed on your Linux machine, along with Tauri's system dependencies.
+**Prerequisites:**
+You need Node.js (v20+ recommended) and the Rust toolchain installed. You also need the system dependencies required by Tauri on Linux:
+```bash
+sudo apt update
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
+```
 
+**Build Steps:**
 ```bash
 # 1. Clone the repository
 git clone https://github.com/vedesh-padal/wordlex.git
@@ -34,7 +50,8 @@ npm install
 # Create the directory if it doesn't exist:
 mkdir -p src-tauri/resources
 # Download the DB (approx 80MB) and place it exactly here:
-# src-tauri/resources/oewn.db
+wget -qO src-tauri/resources/oewn.db "https://raw.githubusercontent.com/x-englishwordnet/sqlite/master/oewn-2025-sqlite-2.3.2.sqlite.zip"
+# Unzip and rename the file to 'oewn.db' inside that folder.
 
 # 4. Run the Development Server
 npm run tauri dev
