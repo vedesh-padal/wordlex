@@ -220,14 +220,16 @@
 }
 
 .modal-content {
-  background: var(--color-bg);
+  background: var(--color-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border);
   border-radius: 16px;
   width: 90%;
   max-width: 480px;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-shadow);
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -242,15 +244,15 @@
 .modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   font-weight: 600;
   letter-spacing: -0.025em;
 }
 
 .modal-close {
-  background: var(--color-bg-secondary);
+  background: var(--color-surface-hover);
   border: 1px solid var(--color-border);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   cursor: pointer;
   padding: 0.4rem;
   border-radius: 8px;
@@ -261,7 +263,7 @@
 }
 
 .modal-close:hover {
-  background: var(--color-border);
+  background: var(--color-surface-active);
 }
 
 .modal-body {
@@ -291,17 +293,16 @@
 }
 
 .settings-desc {
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   margin: 0 0 1rem 0;
   line-height: 1.5;
 }
 
 .shortcut-recorder {
-  background: var(--color-bg-secondary);
+  background: var(--color-surface-hover);
   border: 1px solid var(--color-border);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -315,7 +316,8 @@
 }
 
 .shortcut-recorder:hover {
-  border-color: var(--color-text-muted);
+  background: var(--color-surface-active);
+  border-color: var(--color-ring);
 }
 
 .shortcut-recorder.recording {
@@ -377,8 +379,8 @@
 }
 
 .db-info-row span {
-  color: var(--color-text);
-  opacity: 0.7;
+  color: var(--color-text-primary);
+  opacity: 0.8;
 }
 
 .spin {
