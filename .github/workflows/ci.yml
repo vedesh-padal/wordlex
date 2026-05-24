@@ -37,6 +37,12 @@ jobs:
       - name: Check TypeScript (Frontend)
         run: npm run lint:ts
 
+      - name: Mock Database for Build Scripts
+        shell: bash
+        run: |
+          mkdir -p src-tauri/resources
+          touch src-tauri/resources/oewn.db
+
       - name: Check Rust formatting
         run: cd src-tauri && cargo fmt -- --check
 
