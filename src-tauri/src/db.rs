@@ -7,6 +7,12 @@ use crate::models::{SearchResult, WordDetail, WordSense};
 // These are the numeric IDs used in semrelations and lexrelations.
 const REL_HYPERNYM: i64 = 1;
 const REL_HYPONYM: i64 = 2;
+const REL_HOLONYM_PART: i64 = 11;
+const REL_MERONYM_PART: i64 = 12;
+const REL_HOLONYM_MEMBER: i64 = 13;
+const REL_MERONYM_MEMBER: i64 = 14;
+const REL_HOLONYM_SUB: i64 = 15;
+const REL_MERONYM_SUB: i64 = 16;
 const REL_ANTONYM: i64 = 30;
 const REL_DERIVATION: i64 = 81;
 
@@ -279,11 +285,10 @@ pub fn lookup_word(conn: &Connection, word_query: &str) -> Result<Option<WordDet
     // Collect synset IDs for this word (for hypernym/hyponym lookups)
     let synset_ids: Vec<i64> = sense_rows.iter().map(|(sid, _, _, _)| *sid).collect();
 
-    // Hypernyms: words in synsets that are hypernyms of any of this word's synsets
-    let hypernyms = get_related_words(conn, &synset_ids, REL_HYPERNYM)?;
-
-    // Hyponyms: words in synsets that are hyponyms of any of this word's synsets
-    let hyponyms = get_related_words(conn, &synset_ids, REL_HYPONYM)?;
+    let hypernyms = get_related_words_in(conn, &synset_ids, &[REL_HYPERNYM])?;
+    let hyponyms = get_related_words_in(conn, &synset_ids, &[REL_HYPONYM])?;
+    let meronyms = get_related_words_in(conn, &synset_ids, &[REL_MERONYM_PART, REL_MERONYM_MEMBER, REL_MERONYM_SUB])?;
+    let holonyms = get_related_words_in(conn, &synset_ids, &[REL_HOLONYM_PART, REL_HOLONYM_MEMBER, REL_HOLONYM_SUB])?;
 
     // Derived forms via lexrelations
     let mut deriv_stmt = conn.prepare(
@@ -303,39 +308,45 @@ pub fn lookup_word(conn: &Connection, word_query: &str) -> Result<Option<WordDet
         senses,
         hypernyms,
         hyponyms,
+        meronyms,
+        holonyms,
         derived_forms,
     }))
 }
 
-/// Helper: get related words via semrelations for a set of synsets.
-///
-/// For example, if we're looking for hypernyms (relation_id = 1), this finds
-/// all synsets that are hypernyms of any of the given synsets, then collects
-/// the member words of those target synsets.
-fn get_related_words(
+/// Helper: get related words via semrelations for a set of synsets and relations.
+fn get_related_words_in(
     conn: &Connection,
     synset_ids: &[i64],
-    relation_id: i64,
+    relation_ids: &[i64],
 ) -> Result<Vec<String>> {
-    if synset_ids.is_empty() {
+    if synset_ids.is_empty() || relation_ids.is_empty() {
         return Ok(vec![]);
     }
 
-    // Build a dynamic IN clause. We use a HashMap to deduplicate.
     let mut words_map: HashMap<String, ()> = HashMap::new();
 
+    let rel_placeholders = relation_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let query = format!(
+        "SELECT DISTINCT w2.word
+         FROM semrelations sr
+         JOIN senses s2 ON s2.synsetid = sr.synset2id
+         JOIN words w2 ON w2.wordid = s2.wordid
+         WHERE sr.synset1id = ? AND sr.relationid IN ({})
+         ORDER BY w2.word",
+        rel_placeholders
+    );
+
     for synset_id in synset_ids {
-        let mut stmt = conn.prepare(
-            "SELECT DISTINCT w2.word
-             FROM semrelations sr
-             JOIN senses s2 ON s2.synsetid = sr.synset2id
-             JOIN words w2 ON w2.wordid = s2.wordid
-             WHERE sr.synset1id = ?1 AND sr.relationid = ?2
-             ORDER BY w2.word",
-        )?;
+        let mut stmt = conn.prepare(&query)?;
+        
+        let mut params_vec: Vec<&dyn rusqlite::ToSql> = vec![synset_id];
+        for rel in relation_ids {
+            params_vec.push(rel);
+        }
 
         let words: Vec<String> = stmt
-            .query_map(params![synset_id, relation_id], |row| row.get(0))?
+            .query_map(rusqlite::params_from_iter(params_vec), |row| row.get(0))?
             .filter_map(|r| r.ok())
             .collect();
 

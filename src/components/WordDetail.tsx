@@ -50,6 +50,12 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
     if (word.hyponyms.length > 0) {
       lines.push(`  Types: ${word.hyponyms.join(", ")}`);
     }
+    if (word.holonyms.length > 0) {
+      lines.push(`  Part of: ${word.holonyms.join(", ")}`);
+    }
+    if (word.meronyms.length > 0) {
+      lines.push(`  Parts: ${word.meronyms.join(", ")}`);
+    }
     navigator.clipboard.writeText(lines.join("\n"));
   };
 
@@ -99,7 +105,7 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
         );
       })}
 
-      {(word.hypernyms.length > 0 || word.hyponyms.length > 0) && (
+      {(word.hypernyms.length > 0 || word.hyponyms.length > 0 || word.meronyms.length > 0 || word.holonyms.length > 0) && (
         <>
           <div className="divider" />
           <div style={{ paddingBottom: "1rem" }}>
@@ -111,6 +117,16 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
             <RelatedWords
               title="Types"
               words={word.hyponyms}
+              onWordClick={onWordClick}
+            />
+            <RelatedWords
+              title="Part of"
+              words={word.holonyms}
+              onWordClick={onWordClick}
+            />
+            <RelatedWords
+              title="Parts"
+              words={word.meronyms}
               onWordClick={onWordClick}
             />
           </div>

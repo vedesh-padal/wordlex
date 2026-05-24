@@ -29,6 +29,8 @@ pub struct WordDetail {
     pub hypernyms: Vec<String>,
     /// Lemmas of hyponym synset members ("types" relationships)
     pub hyponyms: Vec<String>,
+    pub meronyms: Vec<String>,
+    pub holonyms: Vec<String>,
     /// Words derived from this word via derivation relations
     pub derived_forms: Vec<String>,
 }

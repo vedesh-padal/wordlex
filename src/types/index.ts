@@ -19,6 +19,10 @@ export interface WordDetail {
   hypernyms: string[];
   /** "Types" relationships */
   hyponyms: string[];
+  /** "Parts" relationships */
+  meronyms: string[];
+  /** "Part of" relationships */
+  holonyms: string[];
   /** Words derived from this word */
   derived_forms: string[];
 }
