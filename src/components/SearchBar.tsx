@@ -65,7 +65,7 @@ export function SearchBar({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const isShowingResults = isOpen && value.trim().length > 0 && results.length > 0;
+  const isShowingResults = isOpen && isFocused && value.trim().length > 0 && results.length > 0;
   const isShowingHistory = isFocused && !value.trim() && recentHistory.length > 0;
   const isDropdownVisible = isShowingResults || isShowingHistory;
   const currentListLength = isShowingResults ? results.length : isShowingHistory ? recentHistory.length : 0;
