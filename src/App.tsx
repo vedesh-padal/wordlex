@@ -10,6 +10,9 @@ import { LoadingSkeleton } from "./components/LoadingSkeleton";
 import { useWordSearch } from "./hooks/useWordSearch";
 import { useWordDetail } from "./hooks/useWordDetail";
 import { useHistory } from "./hooks/useHistory";
+import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import { readText } from "@tauri-apps/plugin-clipboard-manager";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /**
  * Root application component.
@@ -59,6 +62,48 @@ export default function App() {
       unlisten.then((fn) => fn());
     };
   }, [detail]);
+
+  // Global hotkey & quick lookup
+  useEffect(() => {
+    let isRegistered = false;
+    
+    const setupShortcut = async () => {
+      try {
+        await unregisterAll();
+        await register("Alt+W", async (event) => {
+          if (event.state === "Pressed") {
+            const window = getCurrentWindow();
+            await window.show();
+            await window.setFocus();
+
+            try {
+              const clipText = await readText();
+              if (clipText && clipText.trim().length > 0 && clipText.trim().length < 30) {
+                // If it's a single word or short phrase, auto-search
+                const sanitized = clipText.trim();
+                search.setQuery(sanitized);
+                detail.lookup(sanitized);
+                history.push(sanitized);
+              }
+            } catch (err) {
+              console.warn("Failed to read clipboard:", err);
+            }
+          }
+        });
+        isRegistered = true;
+      } catch (err) {
+        console.error("Failed to register shortcut:", err);
+      }
+    };
+
+    setupShortcut();
+
+    return () => {
+      if (isRegistered) {
+        unregisterAll().catch(console.error);
+      }
+    };
+  }, [search, detail, history]);
 
   // Keyboard shortcuts
   useEffect(() => {
