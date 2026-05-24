@@ -30,6 +30,9 @@
   },
   "bundle": {
     "active": true,
+    "category": "Education",
+    "shortDescription": "A beautiful, native offline dictionary and thesaurus",
+    "longDescription": "WordLex is a lightning-fast, native offline dictionary and thesaurus. It provides instant definitions, synonyms, antonyms, and relations with a beautiful, modern interface.",
     "resources": ["resources/oewn.db"],
     "targets": "all",
     "icon": [

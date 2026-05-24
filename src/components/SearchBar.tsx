@@ -49,9 +49,11 @@ export function SearchBar({
   }, []);
 
   useEffect(() => {
-    setIsOpen(results.length > 0 && value.trim().length > 0);
-    setSelectedIndex(-1);
-  }, [results, value]);
+    if (isFocused) {
+      setIsOpen(results.length > 0 && value.trim().length > 0);
+      setSelectedIndex(-1);
+    }
+  }, [results, value, isFocused]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -156,7 +158,7 @@ export function SearchBar({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => setTimeout(() => setIsFocused(false), 150)}
+          onBlur={() => setIsFocused(false)}
           placeholder="Search 150,000+ words..."
           spellCheck={false}
           autoComplete="off"
@@ -178,9 +180,12 @@ export function SearchBar({
             <button
               key={`${result.word}-${i}`}
               data-result-item
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
                 onSelect(result.word);
                 setIsOpen(false);
+                setIsFocused(false);
+                inputRef.current?.blur();
               }}
               className={`search-result-item ${i === selectedIndex ? 'selected' : ''}`}
             >
@@ -198,9 +203,12 @@ export function SearchBar({
             <button
               key={`hist-${word}-${i}`}
               data-result-item
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
                 onSelect(word);
+                setIsOpen(false);
                 setIsFocused(false);
+                inputRef.current?.blur();
               }}
               className={`search-result-item ${i === selectedIndex ? 'selected' : ''}`}
             >

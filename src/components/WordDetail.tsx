@@ -61,16 +61,16 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
       lines.push(`  Parts: ${word.meronyms.join(", ")}`);
     }
     
-    try {
-      await writeText(lines.join("\n"));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      // Fallback
-      navigator.clipboard.writeText(lines.join("\n"));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    // Execute both web and native clipboard writes simultaneously.
+    // This ensures 100% compatibility across all Linux environments (e.g. both CopyQ and GNOME Vicinae)
+    // without relying on fallbacks that might silently fail to sync across display protocols.
+    await Promise.allSettled([
+      navigator.clipboard.writeText(lines.join("\n")),
+      writeText(lines.join("\n"))
+    ]);
+    
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (

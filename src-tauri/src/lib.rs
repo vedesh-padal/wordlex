@@ -16,20 +16,25 @@ use clap::Parser;
 use colored::*;
 
 #[derive(Parser, Debug)]
-#[command(name = "wordlex", about = "Native Linux dictionary and thesaurus", version)]
+#[command(
+    name = "wordlex",
+    about = "WordLex: A lightning-fast native Linux dictionary and thesaurus.",
+    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)",
+    version
+)]
 struct Cli {
-    /// Open WordLex and instantly search this word
+    /// Open the WordLex GUI and instantly search for this word.
     pub word: Option<String>,
 
-    /// Headless mode: search the database and print the definition to the terminal
+    /// Headless mode: search the SQLite database and print the fully formatted definition to the terminal.
     #[arg(long)]
     pub cli: Option<String>,
 
-    /// Open WordLex and search the current clipboard contents
+    /// Read the system clipboard and search for its contents in the GUI (Bypasses Wayland hotkey restrictions).
     #[arg(long, default_value_t = false)]
     pub from_clipboard: bool,
 
-    /// Open WordLex and instantly search this word
+    /// Explicitly specify a word to search in the GUI (Alternative to positional argument).
     #[arg(short, long)]
     pub search: Option<String>,
 }
