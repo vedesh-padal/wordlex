@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { WordDetail as WordDetailType, WordSense } from "../types";
 import { POSBadge } from "./POSBadge";
 import { SenseCard } from "./SenseCard";
 import { RelatedWords } from "./RelatedWords";
 import { POS_LABELS } from "../types";
-import { Copy } from "lucide-react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { open } from "@tauri-apps/plugin-shell";
+import { Copy, Globe } from "lucide-react";
 
 interface WordDetailProps {
   word: WordDetailType;
@@ -12,6 +14,8 @@ interface WordDetailProps {
 }
 
 export function WordDetailView({ word, onWordClick }: WordDetailProps) {
+  const [copied, setCopied] = useState(false);
+
   const groupedSenses = useMemo(() => {
     const groups: Record<string, WordSense[]> = {};
     for (const sense of word.senses) {
@@ -24,7 +28,7 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
 
   const posOrder = Object.keys(groupedSenses);
 
-  const copyDefinition = () => {
+  const handleCopy = async () => {
     const lines: string[] = [`${word.word}\n`];
     for (const pos of posOrder) {
       const senses = groupedSenses[pos];
@@ -56,7 +60,17 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
     if (word.meronyms.length > 0) {
       lines.push(`  Parts: ${word.meronyms.join(", ")}`);
     }
-    navigator.clipboard.writeText(lines.join("\n"));
+    
+    try {
+      await writeText(lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      // Fallback
+      navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -75,14 +89,26 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
             <p className="word-forms">Forms: {word.derived_forms.join(", ")}</p>
           )}
         </div>
-        <button
-          onClick={copyDefinition}
-          title="Copy full definition"
-          className="titlebar-btn"
-          style={{ width: "2.5rem", height: "2.5rem", borderRadius: "10px", background: "rgba(255,255,255,0.05)" }}
-        >
-          <Copy size={18} />
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button
+            onClick={() => {
+              open(`https://en.wikipedia.org/wiki/${encodeURIComponent(word.word)}`);
+            }}
+            className="titlebar-btn"
+            title="Search Wikipedia"
+            style={{ width: "2.5rem", height: "2.5rem", borderRadius: "12px", background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+          >
+            <Globe size={18} />
+          </button>
+          <button
+            onClick={handleCopy}
+            className="titlebar-btn"
+            title={copied ? "Copied!" : "Copy details"}
+            style={{ width: "2.5rem", height: "2.5rem", borderRadius: "12px", background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+          >
+            {copied ? <span style={{fontSize: "0.8rem", fontWeight: "bold"}}>✓</span> : <Copy size={18} />}
+          </button>
+        </div>
       </div>
 
       <div className="divider" />

@@ -99,7 +99,16 @@ fn search_words_like(
     query: &str,
     limit: usize,
 ) -> Result<Vec<SearchResult>> {
-    let pattern = format!("{}%", query.to_lowercase());
+    let lower_query = query.to_lowercase();
+    let has_wildcards = lower_query.contains('*') || lower_query.contains('?');
+    
+    // If the user uses explicit wildcards, replace them with SQL wildcards.
+    // Otherwise, default to prefix matching.
+    let pattern = if has_wildcards {
+        lower_query.replace('*', "%").replace('?', "_")
+    } else {
+        format!("{}%", lower_query)
+    };
 
     let mut stmt = conn.prepare(
         "SELECT word, wordid FROM words
