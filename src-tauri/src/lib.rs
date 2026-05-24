@@ -5,6 +5,8 @@ mod server;
 
 use std::sync::{Arc, Mutex};
 
+use clap::Parser;
+use colored::*;
 use commands::{DbState, HistoryState};
 use rusqlite::Connection;
 use tauri::{
@@ -12,8 +14,6 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Listener, Manager,
 };
-use clap::Parser;
-use colored::*;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -129,7 +129,7 @@ pub fn run() {
                         "".normal()
                     };
                     println!("\n{}{}", detail.word.bold().green(), pronun);
-                    
+
                     let mut current_pos = String::new();
                     for sense in detail.senses {
                         if sense.pos != current_pos {
@@ -143,9 +143,16 @@ pub fn run() {
                             };
                             println!("\n  {}", pos_label.bold().blue());
                         }
-                        println!("    {}. {}", sense.sense_num.to_string().dimmed(), sense.definition);
+                        println!(
+                            "    {}. {}",
+                            sense.sense_num.to_string().dimmed(),
+                            sense.definition
+                        );
                         if !sense.examples.is_empty() {
-                            println!("       \"{}\"", sense.examples[0].italic().truecolor(180, 180, 180));
+                            println!(
+                                "       \"{}\"",
+                                sense.examples[0].italic().truecolor(180, 180, 180)
+                            );
                         }
                     }
                     println!();
