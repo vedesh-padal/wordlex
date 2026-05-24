@@ -11,16 +11,7 @@ interface WordDetailProps {
   onWordClick: (word: string) => void;
 }
 
-/**
- * Full definition view for a looked-up word.
- *
- * Senses are grouped by part of speech, with each group getting a section
- * header with a POS badge. Within each group, senses are numbered sequentially.
- *
- * Below the senses, related words are shown (hypernyms, hyponyms, derived forms).
- */
 export function WordDetailView({ word, onWordClick }: WordDetailProps) {
-  // Group senses by POS
   const groupedSenses = useMemo(() => {
     const groups: Record<string, WordSense[]> = {};
     for (const sense of word.senses) {
@@ -33,7 +24,6 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
 
   const posOrder = Object.keys(groupedSenses);
 
-  // Build plain text for clipboard
   const copyDefinition = () => {
     const lines: string[] = [`${word.word}\n`];
     for (const pos of posOrder) {
@@ -64,60 +54,38 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
   };
 
   return (
-    <article className="flex-1 overflow-y-auto px-6 py-5 space-y-6 animate-fade-in">
-      {/* Word heading */}
-      <div className="flex items-start justify-between gap-4">
+    <article style={{ animation: "fadeIn 0.3s ease-out" }}>
+      <div className="word-header">
         <div>
-          <h1
-            className="text-3xl font-bold tracking-tight"
-            style={{ color: "var(--color-fg)" }}
-          >
-            {word.word}
-          </h1>
+          <h1 className="word-title">{word.word}</h1>
           {word.derived_forms.length > 0 && (
-            <p
-              className="text-xs mt-1"
-              style={{ color: "var(--color-fg-muted)" }}
-            >
-              Forms: {word.derived_forms.join(", ")}
-            </p>
+            <p className="word-forms">Forms: {word.derived_forms.join(", ")}</p>
           )}
         </div>
         <button
           onClick={copyDefinition}
           title="Copy full definition"
-          className="shrink-0 p-2 rounded-lg transition-colors duration-150
-                     hover:bg-[var(--color-surface-hover)]"
-          style={{ color: "var(--color-fg-muted)" }}
+          className="titlebar-btn"
+          style={{ width: "2.5rem", height: "2.5rem", borderRadius: "10px", background: "rgba(255,255,255,0.05)" }}
         >
-          <Copy size={16} />
+          <Copy size={18} />
         </button>
       </div>
 
-      {/* Divider */}
-      <div
-        className="h-px"
-        style={{ backgroundColor: "var(--color-border)" }}
-      />
+      <div className="divider" />
 
-      {/* Senses grouped by POS */}
       {posOrder.map((pos) => {
         const senses = groupedSenses[pos];
         return (
-          <section key={pos} className="space-y-1">
-            {/* POS section header */}
-            <div className="flex items-center gap-3 pb-1">
+          <section key={pos} className="sense-group">
+            <div className="sense-header">
               <POSBadge pos={pos} size="lg" />
-              <span
-                className="text-xs"
-                style={{ color: "var(--color-fg-muted)" }}
-              >
+              <span className="sense-count">
                 {senses.length} {senses.length === 1 ? "sense" : "senses"}
               </span>
             </div>
 
-            {/* Sense cards */}
-            <div className="pl-1">
+            <div style={{ paddingLeft: "0.25rem" }}>
               {senses.map((sense, i) => (
                 <SenseCard
                   key={sense.synset_id}
@@ -131,15 +99,10 @@ export function WordDetailView({ word, onWordClick }: WordDetailProps) {
         );
       })}
 
-      {/* Related words */}
-      {(word.hypernyms.length > 0 ||
-        word.hyponyms.length > 0) && (
+      {(word.hypernyms.length > 0 || word.hyponyms.length > 0) && (
         <>
-          <div
-            className="h-px"
-            style={{ backgroundColor: "var(--color-border)" }}
-          />
-          <div className="space-y-4 pb-4">
+          <div className="divider" />
+          <div style={{ paddingBottom: "1rem" }}>
             <RelatedWords
               title="Type of"
               words={word.hypernyms}

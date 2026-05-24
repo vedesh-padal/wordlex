@@ -1,37 +1,30 @@
-import { cn, formatPOS, getPOSColor } from "../lib/utils";
+import { formatPOS } from "../lib/utils";
 
 interface POSBadgeProps {
   pos: string;
   size?: "sm" | "md" | "lg";
 }
 
-/**
- * Colour-coded part-of-speech badge.
- *
- * Renders a pill-shaped badge with a coloured dot and label.
- * Sizes: sm (inline), md (default), lg (section headers).
- */
 export function POSBadge({ pos, size = "md" }: POSBadgeProps) {
-  const color = getPOSColor(pos);
   const label = formatPOS(pos);
 
-  const sizeClasses = {
-    sm: "px-1.5 py-0.5 text-[10px]",
-    md: "px-2 py-1 text-xs",
-    lg: "px-2.5 py-1 text-xs",
+  // We set custom properties inline to leverage the CSS variables we defined in index.css
+  const style = {
+    backgroundColor: `var(--color-${pos}-bg, rgba(255,255,255,0.1))`,
+    color: `var(--color-${pos}-text, #fff)`,
+  };
+  
+  const dotStyle = {
+    backgroundColor: `var(--color-${pos}-text, #fff)`,
   };
 
+  // Add specific sizing tweaks if it's small or large
+  const sizeStyle = size === "sm" ? { padding: "0.15rem 0.35rem", fontSize: "0.55rem" } :
+                    size === "lg" ? { padding: "0.25rem 0.6rem", fontSize: "0.7rem" } : {};
+
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 font-medium rounded-full",
-        "uppercase tracking-wider",
-        color.bg,
-        color.text,
-        sizeClasses[size]
-      )}
-    >
-      <span className={cn("w-1.5 h-1.5 rounded-full", color.dot)} />
+    <span className="pos-badge" style={{ ...style, ...sizeStyle }}>
+      <span className="dot" style={dotStyle} />
       {label}
     </span>
   );

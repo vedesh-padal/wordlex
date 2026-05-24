@@ -78,7 +78,7 @@ export default function App() {
   }, [handleGoBack, handleGoForward]);
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: "var(--color-bg)" }}>
+    <div className="app-container">
       <TitleBar
         canGoBack={history.canGoBack}
         canGoForward={history.canGoForward}
@@ -95,22 +95,19 @@ export default function App() {
       />
 
       {/* Main content area */}
-      {detail.isLoading ? (
-        <LoadingSkeleton />
-      ) : detail.word ? (
-        <WordDetailView word={detail.word} onWordClick={handleWordSelect} />
-      ) : detail.error ? (
-        <div className="flex-1 flex items-center justify-center px-8">
-          <p
-            className="text-sm text-center"
-            style={{ color: "var(--color-fg-muted)" }}
-          >
-            {detail.error}
-          </p>
-        </div>
-      ) : (
-        <EmptyState />
-      )}
+      <div className="content-area">
+        {detail.isLoading ? (
+          <LoadingSkeleton />
+        ) : detail.word ? (
+          <WordDetailView word={detail.word} onWordClick={handleWordSelect} />
+        ) : detail.error ? (
+          <div className="empty-state">
+            <p className="empty-desc">{detail.error}</p>
+          </div>
+        ) : (
+          <EmptyState />
+        )}
+      </div>
     </div>
   );
 }
