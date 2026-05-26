@@ -61,10 +61,8 @@ struct Cli {
 fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Error>> {
     let resource_path = app
         .path()
-        .resource_dir()
-        .map_err(|e| format!("Failed to get resource dir: {}", e))?
-        .join("resources")
-        .join("oewn.db");
+        .resolve("resources/oewn.db", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve resource: {}", e))?;
 
     let app_data_dir = app
         .path()
@@ -110,9 +108,9 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
 /// without requiring a running Tauri App instance.
 /// This is used by headless CLI commands that must work even when the GUI is already running.
 fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> {
-    // Tauri stores the DB under ~/.local/share/com.wordlex.desktop/oewn.db
-    let app_data_dir = dirs::data_dir()
-        .ok_or("Could not determine XDG data directory")?
+    // Tauri stores the DB under its standard local data directory (com.wordlex.desktop/oewn.db)
+    let app_data_dir = dirs::data_local_dir()
+        .ok_or("Could not determine local data directory")?
         .join("com.wordlex.desktop");
 
     let db_path = app_data_dir.join("oewn.db");
