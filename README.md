@@ -22,10 +22,10 @@ WordLex is a blisteringly fast, beautifully designed native Linux dictionary and
 The easiest way to install WordLex is to use the pre-built `.deb` package.
 
 1. Go to the [Releases Page](../../releases) on GitHub.
-2. Download the latest `wordlex-v1.5.0_amd64.deb` file.
+2. Download the latest `wordlex-v1.6.0_amd64.deb` file.
 3. Open your terminal and install it:
    ```bash
-   sudo apt install ./wordlex-v1.5.0_amd64.deb
+   sudo apt install ./wordlex-v1.6.0_amd64.deb
    ```
 4. You will now find **WordLex** in your application launcher!
 
