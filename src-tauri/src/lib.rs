@@ -567,7 +567,6 @@ pub fn ensure_main_window(app: &tauri::AppHandle) -> tauri::WebviewWindow {
         .inner_size(900.0, 600.0)
         .min_inner_size(600.0, 400.0)
         .decorations(false)
-        .transparent(false)
         .resizable(true)
         .center()
         .build()
