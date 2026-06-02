@@ -50,9 +50,13 @@ struct Cli {
     #[arg(short, long)]
     pub search: Option<String>,
 
-    /// Run in service mode (HTTP API only, no GUI window).
-    #[arg(long, default_value_t = false, hide = true)]
+    /// Start the WordLex background service (HTTP API only, no GUI window).
+    #[arg(long, default_value_t = false)]
     pub service: bool,
+
+    /// Internal flag to run the blocking service runtime.
+    #[arg(long, default_value_t = false, hide = true)]
+    pub service_internal: bool,
 
     /// Force GUI mode and ensure service process is running.
     #[arg(long, default_value_t = false, hide = true)]
@@ -310,6 +314,7 @@ fn run_service_mode() -> Result<(), Box<dyn std::error::Error>> {
 
 fn should_skip_service_bootstrap(cli: &Cli) -> bool {
     cli.service
+        || cli.service_internal
         || cli.cli.is_some()
         || cli.cli_json.is_some()
         || cli.search_json.is_some()
@@ -333,7 +338,10 @@ fn ensure_service_process() {
     };
 
     if let Err(e) = std::process::Command::new(current_exe)
-        .arg("--service")
+        .arg("--service-internal")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
     {
         log::warn!("Failed to spawn WordLex service mode: {}", e);
@@ -365,6 +373,26 @@ pub fn run() {
     // ─── Headless CLI / runtime mode dispatch: runs BEFORE Tauri ───
     let cli = Cli::parse();
     if cli.service {
+        if server::is_service_running() {
+            println!("{}", "WordLex service is already running.".green());
+            std::process::exit(0);
+        }
+        println!("{}", "Starting WordLex service in the background...".blue());
+        let current_exe = std::env::current_exe().expect("Failed to get current executable path");
+        if let Err(e) = std::process::Command::new(current_exe)
+            .arg("--service-internal")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            eprintln!("{}", format!("Failed to start service: {}", e).red());
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
+
+    if cli.service_internal {
         if let Err(e) = run_service_mode() {
             eprintln!("{}", format!("Service mode failed: {}", e).red());
             std::process::exit(1);
