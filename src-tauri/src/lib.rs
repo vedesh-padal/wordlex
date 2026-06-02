@@ -49,8 +49,15 @@ struct Cli {
     /// Explicitly specify a word to search in the GUI (Alternative to positional argument).
     #[arg(short, long)]
     pub search: Option<String>,
-}
 
+    /// Run in service mode (HTTP API only, no GUI window).
+    #[arg(long, default_value_t = false, hide = true)]
+    pub service: bool,
+
+    /// Force GUI mode and ensure service process is running.
+    #[arg(long, default_value_t = false, hide = true)]
+    pub ui: bool,
+}
 
 const MAIN_DB_CACHE_KB: i32 = -4096;
 const COMMAND_DB_CACHE_KB: i32 = -2048;
@@ -287,15 +294,76 @@ fn handle_headless_cli(cli: &Cli) -> bool {
     false
 }
 
+fn run_service_mode() -> Result<(), Box<dyn std::error::Error>> {
+    if server::is_service_running() {
+        return Ok(());
+    }
+
+    let conn = open_database_standalone()?;
+    let shared = Arc::new(Mutex::new(conn));
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    rt.block_on(server::start_server(shared));
+    Ok(())
+}
+
+fn should_skip_service_bootstrap(cli: &Cli) -> bool {
+    cli.service || cli.cli.is_some() || cli.cli_json.is_some() || cli.search_json.is_some() || cli.random_json
+}
+
+fn ensure_service_process() {
+    if server::is_service_running() {
+        return;
+    }
+
+    let current_exe = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(e) => {
+            log::warn!("Unable to resolve current executable for service bootstrap: {}", e);
+            return;
+        }
+    };
+
+    if let Err(e) = std::process::Command::new(current_exe).arg("--service").spawn() {
+        log::warn!("Failed to spawn WordLex service mode: {}", e);
+        return;
+    }
+
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            log::warn!("Failed to create bootstrap runtime for service readiness checks: {}", e);
+            return;
+        }
+    };
+
+    let ready = rt.block_on(server::wait_for_service_ready(12, 200));
+    if !ready {
+        log::warn!("WordLex service did not become ready after UI bootstrap");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // ─── Headless CLI: runs BEFORE Tauri, bypasses single-instance ───
+    // ─── Headless CLI / runtime mode dispatch: runs BEFORE Tauri ───
     let cli = Cli::parse();
+    if cli.service {
+        if let Err(e) = run_service_mode() {
+            eprintln!("{}", format!("Service mode failed: {}", e).red());
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
     if handle_headless_cli(&cli) {
         std::process::exit(0);
     }
-    // Re-construct args without --cli for Tauri (it will re-parse in setup)
-    drop(cli);
+    if !should_skip_service_bootstrap(&cli) {
+        ensure_service_process();
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -307,6 +375,9 @@ pub fn run() {
                 let _ = window.set_focus();
 
                 if let Ok(cli) = Cli::try_parse_from(args) {
+                    if cli.service {
+                        return;
+                    }
                     let search_term = cli.search.or(cli.word);
                     if let Some(word) = search_term {
                         let _ = window.emit("search-word", word);
@@ -360,10 +431,12 @@ pub fn run() {
             app.manage(HistoryState(Mutex::new(Vec::new())));
 
             // ─── HTTP Server (for Vicinae extension) ────────────
-            let db_for_server = conn_arc.clone();
-            tauri::async_runtime::spawn(async move {
-                server::start_server(db_for_server).await;
-            });
+            if !server::is_service_running() {
+                let db_for_server = conn_arc.clone();
+                tauri::async_runtime::spawn(async move {
+                    server::start_server(db_for_server).await;
+                });
+            }
 
             // ─── System Tray ────────────────────────────────────
             let open_item = MenuItemBuilder::with_id("open", "Open WordLex")
