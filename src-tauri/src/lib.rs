@@ -49,6 +49,44 @@ struct Cli {
     /// Explicitly specify a word to search in the GUI (Alternative to positional argument).
     #[arg(short, long)]
     pub search: Option<String>,
+
+    /// Start the WordLex background service (HTTP API only, no GUI window).
+    #[arg(long, default_value_t = false)]
+    pub service: bool,
+
+    /// Internal flag to run the blocking service runtime.
+    #[arg(long, default_value_t = false, hide = true)]
+    pub service_internal: bool,
+
+    /// Force GUI mode and ensure service process is running.
+    #[arg(long, default_value_t = false, hide = true)]
+    pub ui: bool,
+}
+
+const MAIN_DB_CACHE_KB: i32 = -4096;
+const COMMAND_DB_CACHE_KB: i32 = -2048;
+const STANDALONE_DB_CACHE_KB: i32 = -1024;
+
+fn temp_store_mode() -> &'static str {
+    match std::env::var("WORDLEX_TEMP_STORE") {
+        Ok(mode) if mode.eq_ignore_ascii_case("MEMORY") => "MEMORY",
+        _ => "FILE",
+    }
+}
+
+fn apply_db_pragmas(
+    conn: &Connection,
+    cache_kb: i32,
+    temp_store: &str,
+    with_wal: bool,
+) -> Result<(), rusqlite::Error> {
+    let mut statements = Vec::new();
+    if with_wal {
+        statements.push("PRAGMA journal_mode = WAL;".to_string());
+    }
+    statements.push(format!("PRAGMA cache_size = {};", cache_kb));
+    statements.push(format!("PRAGMA temp_store = {};", temp_store));
+    conn.execute_batch(&statements.join("\n"))
 }
 
 /// Opens the SQLite database from the bundled resources directory.
@@ -57,7 +95,7 @@ struct Cli {
 /// maps it to the correct location at runtime (inside the AppImage, .deb install
 /// dir, or the dev source tree).
 ///
-/// We set WAL journal mode and a generous cache size for read performance.
+/// We set WAL journal mode and a moderate cache size to control daemon memory.
 fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Error>> {
     let resource_path = app
         .path()
@@ -91,12 +129,7 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
-    // Performance pragmas for read-heavy workload
-    conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA cache_size = -32000;
-         PRAGMA temp_store = MEMORY;",
-    )?;
+    apply_db_pragmas(&conn, MAIN_DB_CACHE_KB, temp_store_mode(), true)?;
 
     // Set up FTS5 index (idempotent)
     db::setup_fts(&conn)?;
@@ -128,10 +161,7 @@ fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> 
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
-    conn.execute_batch(
-        "PRAGMA cache_size = -32000;
-         PRAGMA temp_store = MEMORY;",
-    )?;
+    apply_db_pragmas(&conn, STANDALONE_DB_CACHE_KB, temp_store_mode(), false)?;
 
     Ok(conn)
 }
@@ -268,15 +298,113 @@ fn handle_headless_cli(cli: &Cli) -> bool {
     false
 }
 
+fn run_service_mode() -> Result<(), Box<dyn std::error::Error>> {
+    if server::is_service_running() {
+        return Ok(());
+    }
+
+    let conn = open_database_standalone()?;
+    let shared = Arc::new(Mutex::new(conn));
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    rt.block_on(server::start_server(shared));
+    Ok(())
+}
+
+fn should_skip_service_bootstrap(cli: &Cli) -> bool {
+    cli.service
+        || cli.service_internal
+        || cli.cli.is_some()
+        || cli.cli_json.is_some()
+        || cli.search_json.is_some()
+        || cli.random_json
+}
+
+fn ensure_service_process() {
+    if server::is_service_running() {
+        return;
+    }
+
+    let current_exe = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(e) => {
+            log::warn!(
+                "Unable to resolve current executable for service bootstrap: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    if let Err(e) = std::process::Command::new(current_exe)
+        .arg("--service-internal")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        log::warn!("Failed to spawn WordLex service mode: {}", e);
+        return;
+    }
+
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            log::warn!(
+                "Failed to create bootstrap runtime for service readiness checks: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    let ready = rt.block_on(server::wait_for_service_ready(12, 200));
+    if !ready {
+        log::warn!("WordLex service did not become ready after UI bootstrap");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // ─── Headless CLI: runs BEFORE Tauri, bypasses single-instance ───
+    // ─── Headless CLI / runtime mode dispatch: runs BEFORE Tauri ───
     let cli = Cli::parse();
+    if cli.service {
+        if server::is_service_running() {
+            println!("{}", "WordLex service is already running.".green());
+            std::process::exit(0);
+        }
+        println!("{}", "Starting WordLex service in the background...".blue());
+        let current_exe = std::env::current_exe().expect("Failed to get current executable path");
+        if let Err(e) = std::process::Command::new(current_exe)
+            .arg("--service-internal")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            eprintln!("{}", format!("Failed to start service: {}", e).red());
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
+
+    if cli.service_internal {
+        if let Err(e) = run_service_mode() {
+            eprintln!("{}", format!("Service mode failed: {}", e).red());
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
     if handle_headless_cli(&cli) {
         std::process::exit(0);
     }
-    // Re-construct args without --cli for Tauri (it will re-parse in setup)
-    drop(cli);
+    if !should_skip_service_bootstrap(&cli) {
+        ensure_service_process();
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -288,6 +416,9 @@ pub fn run() {
                 let _ = window.set_focus();
 
                 if let Ok(cli) = Cli::try_parse_from(args) {
+                    if cli.service {
+                        return;
+                    }
                     let search_term = cli.search.or(cli.word);
                     if let Some(word) = search_term {
                         let _ = window.emit("search-word", word);
@@ -334,21 +465,19 @@ pub fn run() {
                         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
                             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
                     )?;
-                    conn2.execute_batch(
-                        "PRAGMA journal_mode = WAL;
-                         PRAGMA cache_size = -32000;
-                         PRAGMA temp_store = MEMORY;",
-                    )?;
+                    apply_db_pragmas(&conn2, COMMAND_DB_CACHE_KB, temp_store_mode(), true)?;
                     conn2
                 },
             )));
             app.manage(HistoryState(Mutex::new(Vec::new())));
 
             // ─── HTTP Server (for Vicinae extension) ────────────
-            let db_for_server = conn_arc.clone();
-            tauri::async_runtime::spawn(async move {
-                server::start_server(db_for_server).await;
-            });
+            if !server::is_service_running() {
+                let db_for_server = conn_arc.clone();
+                tauri::async_runtime::spawn(async move {
+                    server::start_server(db_for_server).await;
+                });
+            }
 
             // ─── System Tray ────────────────────────────────────
             let open_item = MenuItemBuilder::with_id("open", "Open WordLex")

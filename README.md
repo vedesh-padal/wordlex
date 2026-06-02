@@ -82,6 +82,10 @@ wordlex --random-json              # random word as JSON
 
 # Clipboard integration
 wordlex --from-clipboard           # read clipboard and search in GUI
+
+# Runtime modes (internal)
+wordlex --service                  # run localhost API only (no GUI)
+wordlex --ui                       # force UI startup and bootstrap service
 ```
 
 ## 🔌 Vicinae Extension

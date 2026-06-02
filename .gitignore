@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 src-tauri/target/
+build-artifacts/
 
 # Generated
 src-tauri/gen/
@@ -25,3 +26,7 @@ src-tauri/resources/*.zip
 # Env
 .env
 .env.local
+
+# Local-only development scripts and benchmarks
+scripts/
+docs/PERF_RESULTS.md

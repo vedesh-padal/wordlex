@@ -11,6 +11,7 @@ import type { SearchResult } from "../types";
  * loading state.
  */
 export function useWordSearch() {
+  const useServiceApi = import.meta.env.VITE_WORDLEX_USE_SERVICE_API === "1";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +25,11 @@ export function useWordSearch() {
 
     setIsLoading(true);
     try {
-      const data = await invoke<SearchResult[]>("search_words", { query: q });
+      const data = useServiceApi
+        ? await fetch(
+            `http://127.0.0.1:17432/search?q=${encodeURIComponent(q)}&limit=50`
+          ).then((res) => (res.ok ? res.json() : Promise.reject(res.statusText)))
+        : await invoke<SearchResult[]>("search_words", { query: q });
       setResults(data);
     } catch (err) {
       console.error("Search failed:", err);
