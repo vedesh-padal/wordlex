@@ -26,3 +26,7 @@ src-tauri/resources/*.zip
 # Env
 .env
 .env.local
+
+# Local-only development scripts and benchmarks
+scripts/
+docs/PERF_RESULTS.md
