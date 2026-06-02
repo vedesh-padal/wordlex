@@ -1,7 +1,7 @@
 {
   "name": "wordlex",
   "private": true,
-  "version": "1.6.0",
+  "version": "2.0.0",
   "description": "Native Linux dictionary and thesaurus powered by Open English WordNet",
   "author": "Vedesh Padal <https://github.com/vedesh-padal>",
   "license": "MIT",
