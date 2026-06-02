@@ -88,23 +88,6 @@ wordlex --service                  # run localhost API only (no GUI)
 wordlex --ui                       # force UI startup and bootstrap service
 ```
 
-## Performance and Packaging Scripts
-
-For memory/perf validation and safe package builds:
-
-```bash
-# Measure WordLex + WebKit memory footprint (RSS + PSS)
-./scripts/measure-memory.sh
-
-# Benchmark headless CLI latency
-./scripts/benchmark-cli-latency.sh wordlex ephemeral
-
-# Archive existing .deb artifacts before building new ones
-./scripts/preserve-deb-artifacts.sh
-```
-
-`WORDLEX_TEMP_STORE=MEMORY` can be used as a rollback override for SQLite temp storage if you need to compare behavior against the default `FILE` mode.
-
 ## 🔌 Vicinae Extension
 
 Search WordLex directly from the [Vicinae](https://github.com/vicinaehq/vicinae) keyboard launcher — without opening the full desktop app.
