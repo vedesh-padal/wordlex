@@ -61,14 +61,21 @@ jobs:
           mkdir -p src-tauri/resources
           if [ ! -f src-tauri/resources/oewn.db ]; then
             echo "Downloading Open English WordNet database..."
-            wget -q "https://raw.githubusercontent.com/x-englishwordnet/sqlite/master/oewn-2025-sqlite-2.3.2.sqlite.zip" -O oewn.zip || echo "Failed to download"
+            curl -sL "https://raw.githubusercontent.com/x-englishwordnet/sqlite/master/oewn-2025-sqlite-2.3.2.sqlite.zip" -o oewn.zip
+            
             if [ -f oewn.zip ]; then
-              unzip -q oewn.zip -d src-tauri/resources/ || echo "Failed to unzip"
-              mv src-tauri/resources/oewn-*.sqlite src-tauri/resources/oewn.db 2>/dev/null || echo "Failed to rename"
+              unzip -q oewn.zip -d src-tauri/resources/
+              mv src-tauri/resources/oewn-*.sqlite src-tauri/resources/oewn.db 2>/dev/null || true
               rm oewn.zip
             else
-              echo "Mocking database file for CI build..."
-              touch src-tauri/resources/oewn.db
+              echo "Error: Failed to download the database!"
+              exit 1
+            fi
+            
+            # Verify the database is actually there and not empty
+            if [ ! -s src-tauri/resources/oewn.db ]; then
+              echo "Error: Database extraction failed or file is empty!"
+              exit 1
             fi
           fi
 
