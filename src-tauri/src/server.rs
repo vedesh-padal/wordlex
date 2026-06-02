@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::{
     extract::{Query, State as AxumState},
@@ -13,6 +14,8 @@ use tower_http::cors::CorsLayer;
 
 use crate::db;
 use crate::models::{SearchResult, WordDetail};
+
+pub const SERVER_ADDR: &str = "127.0.0.1:17432";
 
 /// Shared state for the axum server — wraps the same DB connection.
 #[derive(Clone)]
@@ -53,19 +56,37 @@ pub async fn start_server(db_conn: Arc<Mutex<Connection>>) {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let listener = match tokio::net::TcpListener::bind("127.0.0.1:17432").await {
+    let listener = match tokio::net::TcpListener::bind(SERVER_ADDR).await {
         Ok(l) => l,
         Err(e) => {
-            log::error!("Failed to bind HTTP server on :17432: {}", e);
+            log::error!("Failed to bind HTTP server on {}: {}", SERVER_ADDR, e);
             return;
         }
     };
 
-    log::info!("WordLex HTTP server listening on http://127.0.0.1:17432");
+    log::info!("WordLex HTTP server listening on http://{}", SERVER_ADDR);
 
     if let Err(e) = axum::serve(listener, app).await {
         log::error!("HTTP server error: {}", e);
     }
+}
+
+pub fn is_service_running() -> bool {
+    let addr = match SERVER_ADDR.parse() {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+    std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
+}
+
+pub async fn wait_for_service_ready(retries: usize, delay_ms: u64) -> bool {
+    for _ in 0..retries {
+        if tokio::net::TcpStream::connect(SERVER_ADDR).await.is_ok() {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+    }
+    false
 }
 
 async fn handle_search(
