@@ -26,13 +26,34 @@ const REL_DERIVATION: i64 = 81;
 /// command synchronizes the FTS index with the content table.
 pub fn setup_fts(conn: &Connection) -> Result<()> {
     conn.execute_batch(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS words_fts USING fts5(
+        "CREATE TABLE IF NOT EXISTS wordlex_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+         CREATE VIRTUAL TABLE IF NOT EXISTS words_fts USING fts5(
             word,
             content='words',
             content_rowid='wordid'
         );",
     )?;
-    conn.execute_batch("INSERT INTO words_fts(words_fts) VALUES('rebuild');")?;
+
+    let initialized: Option<String> = conn
+        .query_row(
+            "SELECT value FROM wordlex_meta WHERE key = 'fts_initialized'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    if initialized.as_deref() != Some("1") {
+        conn.execute_batch("INSERT INTO words_fts(words_fts) VALUES('rebuild');")?;
+        conn.execute(
+            "INSERT INTO wordlex_meta (key, value) VALUES ('fts_initialized', '1')
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            [],
+        )?;
+    }
+
     Ok(())
 }
 
