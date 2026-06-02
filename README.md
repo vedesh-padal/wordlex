@@ -92,7 +92,7 @@ wordlex --ui                       # force UI startup and bootstrap service
 
 Search WordLex directly from the [Vicinae](https://github.com/vicinaehq/vicinae) keyboard launcher — without opening the full desktop app.
 
-See the [wordlex-vicinae](../wordlex-vicinae) extension for installation instructions.
+See the [wordlex-vicinae](https://github.com/vedesh-padal/wordlex-vicinae) extension for installation instructions.
 
 ## 🏗️ Architecture & Technical Details
 
