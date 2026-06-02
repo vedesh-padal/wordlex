@@ -309,7 +309,11 @@ fn run_service_mode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn should_skip_service_bootstrap(cli: &Cli) -> bool {
-    cli.service || cli.cli.is_some() || cli.cli_json.is_some() || cli.search_json.is_some() || cli.random_json
+    cli.service
+        || cli.cli.is_some()
+        || cli.cli_json.is_some()
+        || cli.search_json.is_some()
+        || cli.random_json
 }
 
 fn ensure_service_process() {
@@ -320,12 +324,18 @@ fn ensure_service_process() {
     let current_exe = match std::env::current_exe() {
         Ok(path) => path,
         Err(e) => {
-            log::warn!("Unable to resolve current executable for service bootstrap: {}", e);
+            log::warn!(
+                "Unable to resolve current executable for service bootstrap: {}",
+                e
+            );
             return;
         }
     };
 
-    if let Err(e) = std::process::Command::new(current_exe).arg("--service").spawn() {
+    if let Err(e) = std::process::Command::new(current_exe)
+        .arg("--service")
+        .spawn()
+    {
         log::warn!("Failed to spawn WordLex service mode: {}", e);
         return;
     }
@@ -336,7 +346,10 @@ fn ensure_service_process() {
     {
         Ok(rt) => rt,
         Err(e) => {
-            log::warn!("Failed to create bootstrap runtime for service readiness checks: {}", e);
+            log::warn!(
+                "Failed to create bootstrap runtime for service readiness checks: {}",
+                e
+            );
             return;
         }
     };
