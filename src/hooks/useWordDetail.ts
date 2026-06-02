@@ -9,6 +9,7 @@ import type { WordDetail } from "../types";
  * The lookup function can be called imperatively from click handlers, etc.
  */
 export function useWordDetail() {
+  const useServiceApi = import.meta.env.VITE_WORDLEX_USE_SERVICE_API === "1";
   const [word, setWord] = useState<WordDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,9 +21,17 @@ export function useWordDetail() {
     setError(null);
 
     try {
-      const data = await invoke<WordDetail | null>("lookup_word", {
-        word: lemma,
-      });
+      const data = useServiceApi
+        ? await fetch(
+            `http://127.0.0.1:17432/lookup?word=${encodeURIComponent(lemma)}`
+          ).then(async (res) => {
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(await res.text());
+            return (await res.json()) as WordDetail;
+          })
+        : await invoke<WordDetail | null>("lookup_word", {
+            word: lemma,
+          });
       setWord(data);
       if (!data) {
         setError(`No definition found for "${lemma}"`);
@@ -41,7 +50,13 @@ export function useWordDetail() {
     setError(null);
 
     try {
-      const data = await invoke<WordDetail | null>("get_random_word");
+      const data = useServiceApi
+        ? await fetch("http://127.0.0.1:17432/random").then(async (res) => {
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(await res.text());
+            return (await res.json()) as WordDetail;
+          })
+        : await invoke<WordDetail | null>("get_random_word");
       setWord(data);
     } catch (err) {
       console.error("Random word failed:", err);
