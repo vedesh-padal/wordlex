@@ -51,13 +51,40 @@ struct Cli {
     pub search: Option<String>,
 }
 
+
+const MAIN_DB_CACHE_KB: i32 = -4096;
+const COMMAND_DB_CACHE_KB: i32 = -2048;
+const STANDALONE_DB_CACHE_KB: i32 = -1024;
+
+fn temp_store_mode() -> &'static str {
+    match std::env::var("WORDLEX_TEMP_STORE") {
+        Ok(mode) if mode.eq_ignore_ascii_case("MEMORY") => "MEMORY",
+        _ => "FILE",
+    }
+}
+
+fn apply_db_pragmas(
+    conn: &Connection,
+    cache_kb: i32,
+    temp_store: &str,
+    with_wal: bool,
+) -> Result<(), rusqlite::Error> {
+    let mut statements = Vec::new();
+    if with_wal {
+        statements.push("PRAGMA journal_mode = WAL;".to_string());
+    }
+    statements.push(format!("PRAGMA cache_size = {};", cache_kb));
+    statements.push(format!("PRAGMA temp_store = {};", temp_store));
+    conn.execute_batch(&statements.join("\n"))
+}
+
 /// Opens the SQLite database from the bundled resources directory.
 ///
 /// The DB is bundled at `resources/oewn.db` and Tauri's resource resolver
 /// maps it to the correct location at runtime (inside the AppImage, .deb install
 /// dir, or the dev source tree).
 ///
-/// We set WAL journal mode and a generous cache size for read performance.
+/// We set WAL journal mode and a moderate cache size to control daemon memory.
 fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Error>> {
     let resource_path = app
         .path()
@@ -91,12 +118,7 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
-    // Performance pragmas for read-heavy workload
-    conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA cache_size = -32000;
-         PRAGMA temp_store = MEMORY;",
-    )?;
+    apply_db_pragmas(&conn, MAIN_DB_CACHE_KB, temp_store_mode(), true)?;
 
     // Set up FTS5 index (idempotent)
     db::setup_fts(&conn)?;
@@ -128,10 +150,7 @@ fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> 
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
-    conn.execute_batch(
-        "PRAGMA cache_size = -32000;
-         PRAGMA temp_store = MEMORY;",
-    )?;
+    apply_db_pragmas(&conn, STANDALONE_DB_CACHE_KB, temp_store_mode(), false)?;
 
     Ok(conn)
 }
@@ -334,11 +353,7 @@ pub fn run() {
                         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
                             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
                     )?;
-                    conn2.execute_batch(
-                        "PRAGMA journal_mode = WAL;
-                         PRAGMA cache_size = -32000;
-                         PRAGMA temp_store = MEMORY;",
-                    )?;
+                    apply_db_pragmas(&conn2, COMMAND_DB_CACHE_KB, temp_store_mode(), true)?;
                     conn2
                 },
             )));
