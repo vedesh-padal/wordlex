@@ -407,29 +407,24 @@ pub fn run() {
     }
 
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, _shortcut, event| {
-                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        let _ = ensure_main_window(app);
-                    }
-                })
-                .build(),
-        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            let window = ensure_main_window(app);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
 
-            if let Ok(cli) = Cli::try_parse_from(args) {
-                if cli.service {
-                    return;
-                }
-                let search_term = cli.search.or(cli.word);
-                if let Some(word) = search_term {
-                    let _ = window.emit("search-word", word);
-                } else if cli.from_clipboard {
-                    let _ = window.emit("search-clipboard", ());
+                if let Ok(cli) = Cli::try_parse_from(args) {
+                    if cli.service {
+                        return;
+                    }
+                    let search_term = cli.search.or(cli.word);
+                    if let Some(word) = search_term {
+                        let _ = window.emit("search-word", word);
+                    } else if cli.from_clipboard {
+                        let _ = window.emit("search-clipboard", ());
+                    }
                 }
             }
         }))
@@ -503,11 +498,17 @@ pub fn run() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "open" => {
-                        let _ = ensure_main_window(app);
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
                     }
                     "wotd" => {
-                        let window = ensure_main_window(app);
-                        let _ = window.emit("show-random-word", ());
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = window.emit("show-random-word", ());
+                        }
                     }
                     "quit" => {
                         app.exit(0);
@@ -517,7 +518,10 @@ pub fn run() {
                 .on_tray_icon_event(|tray, event| {
                     if let tauri::tray::TrayIconEvent::Click { .. } = event {
                         let app = tray.app_handle();
-                        let _ = ensure_main_window(app);
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
                     }
                 })
                 .build(app)?;
@@ -529,8 +533,15 @@ pub fn run() {
             });
 
             // ─── Window: hide on close instead of quitting ──────
-            // We no longer prevent_close(). The window will be destroyed to save memory.
-            // RunEvent::ExitRequested is handled below to keep the tray alive.
+            if let Some(window) = app.get_webview_window("main") {
+                let win = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win.hide();
+                    }
+                });
+            }
 
             Ok(())
         })
@@ -542,35 +553,6 @@ pub fn run() {
             commands::clear_history,
             commands::quit_app,
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building WordLex")
-        .run(|_app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
-            }
-        });
-}
-
-pub fn ensure_main_window(app: &tauri::AppHandle) -> tauri::WebviewWindow {
-    use tauri::Manager;
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        window
-    } else {
-        let window = tauri::WebviewWindowBuilder::new(
-            app,
-            "main",
-            tauri::WebviewUrl::App("index.html".into()),
-        )
-        .title("WordLex")
-        .inner_size(900.0, 600.0)
-        .min_inner_size(600.0, 400.0)
-        .decorations(false)
-        .resizable(true)
-        .center()
-        .build()
-        .expect("Failed to build window");
-        window
-    }
+        .run(tauri::generate_context!())
+        .expect("error while running WordLex");
 }

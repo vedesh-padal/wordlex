@@ -1,11 +1,11 @@
 import { defineConfig } from "vite";
-import preact from "@preact/preset-vite";
+import react from "@vitejs/plugin-react";
 
 // https://tauri.app/start/frontend/vite/
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig(async () => ({
-  plugins: [preact()],
+  plugins: [react()],
   clearScreen: false,
   server: {
     port: 1420,
