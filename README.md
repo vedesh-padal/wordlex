@@ -22,10 +22,10 @@ WordLex is a blisteringly fast, beautifully designed native Linux dictionary and
 The easiest way to install WordLex is to use the pre-built `.deb` package.
 
 1. Go to the [Releases Page](../../releases) on GitHub.
-2. Download the latest `wordlex-v2.0.0_amd64.deb` file.
+2. Download the latest `WordLex_2.0.0_amd64.deb` file.
 3. Open your terminal and install it:
    ```bash
-   sudo apt install ./wordlex-v2.0.0_amd64.deb
+   sudo apt install ./WordLex_2.0.0_amd64.deb
    ```
 4. You will now find **WordLex** in your application launcher!
 
@@ -53,11 +53,16 @@ npm install
 
 # 3. Download the Database
 # For WordLex to work, you MUST place the 'oewn.db' SQLite file into the resources folder.
-# Create the directory if it doesn't exist:
 mkdir -p src-tauri/resources
-# Download the DB (approx 80MB) and place it exactly here:
-wget -qO src-tauri/resources/oewn.db "https://raw.githubusercontent.com/x-englishwordnet/sqlite/master/oewn-2025-sqlite-2.3.2.sqlite.zip"
-# Unzip and rename the file to 'oewn.db' inside that folder.
+# Download the WordNet zip (~80MB; extracts to a ~168MB .sqlite) and rename the
+# extracted file to 'oewn.db'. Do NOT save the zip bytes directly as oewn.db —
+# that produces a "file is not a database" error on first launch.
+curl -sL "https://raw.githubusercontent.com/x-englishwordnet/sqlite/master/oewn-2025-sqlite-2.3.2.sqlite.zip" -o oewn.zip
+unzip -q oewn.zip -d src-tauri/resources/
+mv src-tauri/resources/oewn-*.sqlite src-tauri/resources/oewn.db
+rm oewn.zip
+# Verify it really is a database (must report "SQLite 3.x database"):
+file src-tauri/resources/oewn.db
 
 # 4. Run the Development Server
 npm run tauri dev
@@ -65,17 +70,19 @@ npm run tauri dev
 
 ## ⌨️ CLI Usage
 
-WordLex includes a full-featured command-line interface:
+WordLex includes a full-featured command-line interface. Every `--cli*` and
+`--random-json` flag is fully headless — it prints to stdout and exits without
+opening the GUI, so it is safe to use in scripts and from the Vicinae extension.
 
 ```bash
 # Open GUI and search a word
 wordlex ephemeral
 wordlex --search ephemeral
 
-# Terminal output (colored)
+# Terminal output (colored, no GUI)
 wordlex --cli ephemeral
 
-# JSON output (for scripts/tooling)
+# JSON output (for scripts/tooling, no GUI)
 wordlex --cli-json ephemeral       # full word detail as JSON
 wordlex --search-json eph          # prefix search results as JSON
 wordlex --random-json              # random word as JSON
@@ -83,9 +90,8 @@ wordlex --random-json              # random word as JSON
 # Clipboard integration
 wordlex --from-clipboard           # read clipboard and search in GUI
 
-# Runtime modes (internal)
-wordlex --service                  # run localhost API only (no GUI)
-wordlex --ui                       # force UI startup and bootstrap service
+# Optional localhost API service (HTTP only, no GUI window)
+wordlex --service
 ```
 
 ## 🔌 Vicinae Extension
@@ -98,7 +104,7 @@ See the [wordlex-vicinae](https://github.com/vedesh-padal/wordlex-vicinae) exten
 
 WordLex uses a sophisticated Rust backend to execute highly optimized SQLite queries against the WordNet database, passing the results safely to a React frontend via Tauri commands.
 
-For an in-depth dive into the database schema, query optimizations, Rust application state, and UI architecture, please read the [Technical Details Guide](TECHNICAL_DETAILS.md).
+For an in-depth dive into the database schema, query optimizations, Rust application state, and UI architecture, please read the [Technical Details Guide](docs/TECHNICAL_DETAILS.md).
 
 ## 📄 License
 
