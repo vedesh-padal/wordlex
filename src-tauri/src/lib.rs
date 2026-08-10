@@ -59,7 +59,7 @@ struct Cli {
     #[arg(long, default_value_t = false, hide = true)]
     pub service_internal: bool,
 
-    /// Force GUI mode and ensure service process is running.
+    /// Force GUI mode.
     #[arg(long, default_value_t = false, hide = true)]
     pub ui: bool,
 }
@@ -466,62 +466,6 @@ fn run_service_mode() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn should_skip_service_bootstrap(cli: &Cli) -> bool {
-    cli.service
-        || cli.service_internal
-        || cli.cli.is_some()
-        || cli.cli_json.is_some()
-        || cli.search_json.is_some()
-        || cli.random_json
-}
-
-fn ensure_service_process() {
-    if server::is_service_running() {
-        return;
-    }
-
-    let current_exe = match std::env::current_exe() {
-        Ok(path) => path,
-        Err(e) => {
-            log::warn!(
-                "Unable to resolve current executable for service bootstrap: {}",
-                e
-            );
-            return;
-        }
-    };
-
-    if let Err(e) = std::process::Command::new(current_exe)
-        .arg("--service-internal")
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
-        log::warn!("Failed to spawn WordLex service mode: {}", e);
-        return;
-    }
-
-    let rt = match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(rt) => rt,
-        Err(e) => {
-            log::warn!(
-                "Failed to create bootstrap runtime for service readiness checks: {}",
-                e
-            );
-            return;
-        }
-    };
-
-    let ready = rt.block_on(server::wait_for_service_ready(12, 200));
-    if !ready {
-        log::warn!("WordLex service did not become ready after UI bootstrap");
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // ─── Headless CLI / runtime mode dispatch: runs BEFORE Tauri ───
@@ -556,9 +500,6 @@ pub fn run() {
     if handle_headless_cli(&cli) {
         std::process::exit(0);
     }
-    if !should_skip_service_bootstrap(&cli) {
-        ensure_service_process();
-    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -584,7 +525,9 @@ pub fn run() {
         }))
         .setup(|app| {
             // ─── Database ───────────────────────────────────────
-            let conn = open_database(app)?;
+            // ensure_database() and the FTS setup run here as side effects;
+            // the GUI queries through the dedicated DbState connection below.
+            open_database(app)?;
 
             // ─── Parse CLI Args (GUI-only flags) ────────────────
             // Note: --cli is already handled before Tauri init (see handle_headless_cli).
@@ -604,13 +547,9 @@ pub fn run() {
                 });
             }
 
-            let conn_arc = Arc::new(Mutex::new(conn));
-
             // Register Tauri managed state
             app.manage(DbState(Mutex::new(
-                // Open a second connection for Tauri commands so we don't
-                // contend with the HTTP server's Arc<Mutex<Connection>>.
-                // Both are read-only so no write contention.
+                // Dedicated connection for Tauri commands.
                 {
                     let db_path = app.path().app_data_dir()?.join("oewn.db");
 
@@ -624,14 +563,6 @@ pub fn run() {
                 },
             )));
             app.manage(HistoryState(Mutex::new(Vec::new())));
-
-            // ─── HTTP Server (for Vicinae extension) ────────────
-            if !server::is_service_running() {
-                let db_for_server = conn_arc.clone();
-                tauri::async_runtime::spawn(async move {
-                    server::start_server(db_for_server).await;
-                });
-            }
 
             // ─── System Tray ────────────────────────────────────
             let open_item = MenuItemBuilder::with_id("open", "Open WordLex")

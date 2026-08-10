@@ -79,16 +79,6 @@ pub fn is_service_running() -> bool {
     std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
 }
 
-pub async fn wait_for_service_ready(retries: usize, delay_ms: u64) -> bool {
-    for _ in 0..retries {
-        if tokio::net::TcpStream::connect(SERVER_ADDR).await.is_ok() {
-            return true;
-        }
-        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-    }
-    false
-}
-
 async fn handle_search(
     AxumState(state): AxumState<AppState>,
     Query(params): Query<SearchParams>,
