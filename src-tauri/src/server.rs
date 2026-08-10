@@ -44,7 +44,7 @@ pub struct LookupParams {
 ///   GET /search?q=<prefix>&limit=<n>  → Vec<SearchResult>
 ///   GET /lookup?word=<word>            → WordDetail (or 404)
 ///   GET /random                        → WordDetail (or 404)
-///   GET /health                        → {"status":"ok","version":"0.1.0"}
+///   GET /health                        → {"status":"ok","version":"<app version>"}
 pub async fn start_server(db_conn: Arc<Mutex<Connection>>) {
     let state = AppState { db: db_conn };
 
@@ -132,7 +132,7 @@ async fn handle_random(
 async fn handle_health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "ok",
-        "version": "0.1.0",
+        "version": env!("CARGO_PKG_VERSION"),
         "app": "WordLex"
     }))
 }
