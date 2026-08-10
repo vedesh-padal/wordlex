@@ -523,15 +523,13 @@ pub fn run() {
                 }
             }
         }))
-        .setup(|app| {
+        .setup(move |app| {
             // ─── Database ───────────────────────────────────────
             // ensure_database() and the FTS setup run here as side effects;
             // the GUI queries through the dedicated DbState connection below.
             open_database(app)?;
 
-            // ─── Parse CLI Args (GUI-only flags) ────────────────
-            // Note: --cli is already handled before Tauri init (see handle_headless_cli).
-            let cli = Cli::parse();
+            // ─── Reuse the CLI args parsed before Tauri init ───
             let search_term = cli.search.or(cli.word);
             if let Some(word) = search_term {
                 let handle = app.handle().clone();
