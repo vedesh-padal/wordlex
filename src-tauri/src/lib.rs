@@ -3,6 +3,7 @@ mod db;
 mod models;
 mod server;
 
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use clap::Parser;
@@ -67,6 +68,12 @@ const MAIN_DB_CACHE_KB: i32 = -4096;
 const COMMAND_DB_CACHE_KB: i32 = -2048;
 const STANDALONE_DB_CACHE_KB: i32 = -1024;
 
+/// Filename of the SQLite database in both the bundled resources and the data dir.
+const DB_FILE: &str = "oewn.db";
+
+/// Magic bytes that every SQLite database file starts with.
+const SQLITE_HEADER: [u8; 16] = *b"SQLite format 3\0";
+
 fn temp_store_mode() -> &'static str {
     match std::env::var("WORDLEX_TEMP_STORE") {
         Ok(mode) if mode.eq_ignore_ascii_case("MEMORY") => "MEMORY",
@@ -89,13 +96,177 @@ fn apply_db_pragmas(
     conn.execute_batch(&statements.join("\n"))
 }
 
-/// Opens the SQLite database from the bundled resources directory.
+/// Resolves the application data directory the same way Tauri does:
+/// `dirs::data_dir()` + the bundle identifier `com.wordlex.desktop`.
 ///
-/// The DB is bundled at `resources/oewn.db` and Tauri's resource resolver
-/// maps it to the correct location at runtime (inside the AppImage, .deb install
-/// dir, or the dev source tree).
+/// The headless CLI must agree with the GUI's `app.path().app_data_dir()` on
+/// every OS. Notably on Windows `dirs::data_local_dir()` points at Local,
+/// while Tauri's app data dir lives under Roaming — using `data_dir()` keeps
+/// both code paths in sync on all platforms.
+fn app_data_dir_path() -> Option<PathBuf> {
+    dirs::data_dir().map(|base| base.join("com.wordlex.desktop"))
+}
+
+/// Ordered candidate locations for the bundled database, most specific first.
 ///
-/// We set WAL journal mode and a moderate cache size to control daemon memory.
+/// `primary` is the Tauri-resolved resource path (GUI only); headless callers
+/// pass `None` and rely on the standard install layouts plus the
+/// `WORDLEX_DB_PATH` override.
+fn bundled_database_candidates(primary: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    // Explicit override wins over everything else.
+    if let Ok(override_path) = std::env::var("WORDLEX_DB_PATH") {
+        if !override_path.trim().is_empty() {
+            candidates.push(PathBuf::from(override_path));
+        }
+    }
+
+    if let Some(path) = primary {
+        candidates.push(path);
+    }
+
+    // Dev tree: compile-time repo path works regardless of the current directory.
+    candidates.push(PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/oewn.db"
+    )));
+
+    // Layouts relative to the running executable:
+    //   AppImage mount: <mount>/usr/bin/wordlex -> <mount>/usr/lib/WordLex/resources/oewn.db
+    //   macOS app:      WordLex.app/Contents/MacOS/wordlex -> WordLex.app/Contents/Resources/oewn.db
+    //   Windows bundle: <install>/wordlex.exe -> <install>/resources/oewn.db
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("../lib/WordLex/resources/oewn.db"));
+            candidates.push(dir.join("../lib64/WordLex/resources/oewn.db"));
+            candidates.push(dir.join("../Resources/oewn.db"));
+            candidates.push(dir.join("../resources/oewn.db"));
+        }
+    }
+
+    // Standard system package installs.
+    candidates.push(PathBuf::from("/usr/lib/WordLex/resources/oewn.db"));
+    candidates.push(PathBuf::from("/usr/lib64/WordLex/resources/oewn.db"));
+
+    candidates
+}
+
+/// Cheap validity probe: non-empty, starts with the SQLite header magic, and
+/// exposes a readable schema. Deliberately avoids a full integrity scan so
+/// startup stays fast.
+fn is_valid_sqlite(path: &Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return false;
+    };
+    if metadata.len() == 0 {
+        return false;
+    }
+
+    let mut magic = [0u8; 16];
+    {
+        use std::io::Read;
+        let Ok(mut file) = std::fs::File::open(path) else {
+            return false;
+        };
+        if file.read_exact(&mut magic).is_err() {
+            return false;
+        }
+    }
+    if magic != SQLITE_HEADER {
+        return false;
+    }
+
+    match rusqlite::Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) {
+        Ok(conn) => {
+            let readable = conn
+                .query_row("SELECT count(*) FROM sqlite_master", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .is_ok();
+            drop(conn);
+            readable
+        }
+        Err(_) => false,
+    }
+}
+
+/// Ensures a valid, usable `oewn.db` exists in `data_dir` and returns its path.
+///
+/// If the existing copy is missing or corrupt, the bundled database is copied
+/// in atomically (temp file + rename). This repairs the long-standing
+/// "file is not a database" failure caused by a previously interrupted write,
+/// which used to brick every subsequent launch until the file was removed.
+fn ensure_database(
+    data_dir: &Path,
+    bundled_candidates: &[PathBuf],
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if !data_dir.exists() {
+        std::fs::create_dir_all(data_dir)?;
+    }
+
+    let db_path = data_dir.join(DB_FILE);
+
+    if db_path.is_file() && is_valid_sqlite(&db_path) {
+        return Ok(db_path);
+    }
+
+    let bundled = bundled_candidates
+        .iter()
+        .find(|candidate| candidate.is_file())
+        .cloned()
+        .ok_or_else(|| {
+            let mut message = format!(
+                "WordLex database not found at {:?} and no bundled copy was found. Tried:",
+                db_path
+            );
+            for candidate in bundled_candidates {
+                message.push_str(&format!("\n  - {:?}", candidate));
+            }
+            message
+                .push_str("\nRun the WordLex GUI once to initialize it, or set WORDLEX_DB_PATH.");
+            message
+        })?;
+
+    // Atomic replace so a crash mid-copy can never leave a half-written DB.
+    let tmp_path = data_dir.join(format!("{}.tmp-{}", DB_FILE, std::process::id()));
+    std::fs::copy(&bundled, &tmp_path)?;
+
+    // The bundled file may live on a read-only mount (e.g. AppImage); make the
+    // copy writable so WAL journaling works later.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o644))?;
+    }
+
+    if !is_valid_sqlite(&tmp_path) {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(format!(
+            "Bundled database at {:?} failed validation after copy.",
+            bundled
+        )
+        .into());
+    }
+
+    if std::fs::rename(&tmp_path, &db_path).is_err() {
+        // e.g. Windows when the destination already exists; replace instead.
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(&tmp_path);
+        std::fs::copy(&bundled, &db_path)?;
+    }
+
+    Ok(db_path)
+}
+
+/// Opens the SQLite database used by the GUI.
+///
+/// Ensures a valid copy exists in the app data dir (copying the bundled
+/// `resources/oewn.db` when missing or corrupt), then opens it read-write with
+/// WAL journaling and a bounded page cache.
 fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Error>> {
     let resource_path = app
         .path()
@@ -107,22 +278,8 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
-    if !app_data_dir.exists() {
-        std::fs::create_dir_all(&app_data_dir)?;
-    }
-
-    let db_path = app_data_dir.join("oewn.db");
-
-    if !db_path.exists() {
-        if !resource_path.exists() {
-            return Err(format!(
-                "Bundled database not found at {:?}. Please place oewn.db in src-tauri/resources/",
-                resource_path
-            )
-            .into());
-        }
-        std::fs::copy(&resource_path, &db_path)?;
-    }
+    let candidates = bundled_database_candidates(Some(resource_path));
+    let db_path = ensure_database(&app_data_dir, &candidates)?;
 
     let conn = Connection::open_with_flags(
         &db_path,
@@ -137,31 +294,28 @@ fn open_database(app: &tauri::App) -> Result<Connection, Box<dyn std::error::Err
     Ok(conn)
 }
 
-/// Opens the database directly from the XDG app data directory,
-/// without requiring a running Tauri App instance.
-/// This is used by headless CLI commands that must work even when the GUI is already running.
+/// Opens the database from the app data directory without requiring a running
+/// Tauri instance, for headless CLI commands and the `--service` daemon.
+///
+/// Resolves the same data directory the GUI uses (including on Windows, where
+/// `data_local_dir` would point somewhere different) and runs the same
+/// validation/repair so headless callers recover from corrupt databases too.
 fn open_database_standalone() -> Result<Connection, Box<dyn std::error::Error>> {
-    // Tauri stores the DB under its standard local data directory (com.wordlex.desktop/oewn.db)
-    let app_data_dir = dirs::data_local_dir()
-        .ok_or("Could not determine local data directory")?
-        .join("com.wordlex.desktop");
+    let app_data_dir = app_data_dir_path().ok_or("Could not determine the local data directory")?;
 
-    let db_path = app_data_dir.join("oewn.db");
-
-    if !db_path.exists() {
-        return Err(format!(
-            "WordLex database not found at {:?}. Run the WordLex GUI at least once to initialize the database.",
-            db_path
-        )
-        .into());
-    }
+    let candidates = bundled_database_candidates(None);
+    let db_path = ensure_database(&app_data_dir, &candidates)?;
 
     let conn = Connection::open_with_flags(
         &db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
 
     apply_db_pragmas(&conn, STANDALONE_DB_CACHE_KB, temp_store_mode(), false)?;
+
+    // Headless callers also rely on the FTS5 prefix index; make sure it exists
+    // even when the GUI has never run on this machine.
+    db::setup_fts(&conn)?;
 
     Ok(conn)
 }
