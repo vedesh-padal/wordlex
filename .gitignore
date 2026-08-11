@@ -28,5 +28,11 @@ src-tauri/resources/*.zip
 .env.local
 
 # Local-only development scripts and benchmarks
-scripts/
+scripts/benchmark-cli-latency.sh
+scripts/measure-memory.sh
+scripts/preserve-deb-artifacts.sh
+scripts/generate-wordlex-icon.py
 docs/PERF_RESULTS.md
+
+# Tooling (private agent state)
+.commandcode/

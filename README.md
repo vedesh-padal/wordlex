@@ -19,9 +19,11 @@ WordLex is a blisteringly fast, beautifully designed native Linux dictionary and
 
 On Linux every path installs the **same WordLex build** — the `.deb`, `.rpm`, and AppImage only differ in packaging. Pick whichever you prefer; you only need one.
 
+Each platform ships both **x86-64 (Intel/AMD)** and **arm64 (aarch64)** builds — macOS (`.dmg`), Linux (`.deb`/`.rpm`/AppImage), and Windows (`.msi`/`.exe`, x64). Grab the asset matching your machine's architecture.
+
 ### Quick Install (one command)
 
-The installer script picks the native package for your OS/distro automatically (`.deb`, `.rpm`, or `.dmg`), and falls back to the AppImage on Linux when no native package exists.
+The installer script picks the native package for your OS/distro **and architecture** automatically (`.deb`, `.rpm`, or `.dmg`), and falls back to the AppImage on Linux when no native package exists.
 
 **Linux / macOS** — in a terminal:
 
@@ -39,10 +41,10 @@ To install a specific version instead of the latest: `VERSION=2.0.0 curl -fsSL �
 
 ### Ubuntu / Debian / Linux Mint — `.deb` (recommended)
 
-1. Download `WordLex_2.0.0_amd64.deb` from the [Releases Page](../../releases).
+1. Download `WordLex_2.0.0_amd64.deb` (or `WordLex_2.0.0_arm64.deb` on ARM64) from the [Releases Page](../../releases).
 2. Install it:
    ```bash
-   sudo apt install ./WordLex_2.0.0_amd64.deb
+   sudo apt install ./WordLex_2.0.0_amd64.deb   # _arm64.deb on ARM64
    ```
 3. **WordLex** now appears in your application launcher, with its icon.
 
@@ -52,7 +54,7 @@ To install a specific version instead of the latest: `VERSION=2.0.0 curl -fsSL �
 The package manager owns the binary, desktop entry, icon, and launcher entry, so removal is a single command:
 
 ```bash
-sudo dpkg -r word-lex
+sudo dpkg -r wordlex
 ```
 
 Your search history lives in `~/.local/share/com.wordlex.desktop` and is kept on uninstall; delete that folder too if you want a complete wipe.
@@ -63,7 +65,7 @@ Your search history lives in `~/.local/share/com.wordlex.desktop` and is kept on
 <details>
 <summary><b>Install</b></summary>
 
-1. Make it executable:
+1. Make it executable (use `WordLex_2.0.0_aarch64.AppImage` on ARM64):
    ```bash
    chmod +x WordLex_2.0.0_amd64.AppImage
    ```
@@ -93,7 +95,7 @@ This removes the `wordlex` launcher, the desktop entry, and the icon. The AppIma
 
 ```bash
 sudo dnf install ./WordLex-*.rpm      # or: sudo rpm -ivh ./WordLex-*.rpm
-sudo dnf remove word-lex              # or: sudo rpm -e word-lex
+sudo dnf remove wordlex               # or: sudo rpm -e wordlex
 ```
 </details>
 
@@ -110,9 +112,34 @@ No native package — use the [AppImage](#appimage-any-linux-distro) above. Remo
 <details>
 <summary><b>Install / remove</b></summary>
 
-- **macOS:** open the `.dmg` and drag WordLex into Applications. Remove it by deleting the app from Applications. No CLI-launcher flag needed — the app bundle handles the icon and menu.
-- **Windows:** run the `.msi` installer. Remove it via Settings → Apps or the installer's uninstall entry. No CLI-launcher flag needed — the installer adds WordLex to the Start Menu.
+- **macOS:** open the `.dmg` (or extract `WordLex_x64.app.tar.gz` / `WordLex_aarch64.app.tar.gz`) and drag WordLex into Applications. Remove it by deleting the app from Applications. No CLI-launcher flag needed — the app bundle handles the icon and menu.
+- **Windows:** run the `.msi` installer, or the `x64-setup.exe` (NSIS) for a per-user install. Remove it via Settings → Apps → WordLex, or the installer's uninstall entry (NSIS also places an uninstaller under `%LOCALAPPDATA%\WordLex\`). No CLI-launcher flag needed — the installer adds WordLex to the Start Menu.
 </details>
+
+### Verify your install
+
+After any installation, confirm WordLex is actually working:
+
+| Platform | Checks |
+|---|---|
+| Linux `.deb` / `.rpm` | `command -v wordlex` and `wordlex --version`; the launcher entry: `test -f ~/.local/share/applications/WordLex.desktop` |
+| Linux AppImage | `ls -l ~/Applications/WordLex.AppImage` (the path used by the [Quick Install](#quick-install-one-command) script); `./WordLex_*_amd64.AppImage --version` |
+| macOS | `/Applications/WordLex.app` exists; `open -a WordLex` launches it |
+| Windows | WordLex appears in Start Menu / Settings → Apps; `& "$env:LOCALAPPDATA\WordLex\wordlex.exe" --version` (NSIS) or `"C:\Program Files\WordLex\wordlex.exe" --version` (MSI) |
+
+The `--version` flag doubles as a first-run check — it initializes the dictionary database if needed.
+
+### Complete uninstall / remove leftover data
+
+Uninstalling the app removes the program files, but your dictionary database and search history are **kept** by design so a reinstall keeps your data. To do a complete wipe, delete the data directory too:
+
+| OS | Data directory |
+|---|---|
+| Linux | `~/.local/share/com.wordlex.desktop/` |
+| macOS | `~/Library/Application Support/com.wordlex.desktop/` |
+| Windows | `%APPDATA%\com.wordlex.desktop\` (Roaming) |
+
+The AppImage also leaves its file (e.g. `~/Applications/WordLex.AppImage`) and any `--install-cli` symlink/desktop entry — run `--uninstall-cli` first, then delete the file.
 
 ### Build from Source (developers)
 
