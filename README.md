@@ -2,6 +2,8 @@
 
 WordLex is a blisteringly fast, beautifully designed native Linux dictionary and thesaurus. Powered by the incredibly comprehensive Open English WordNet database, WordLex provides instant, 100% offline word lookups right at your fingertips.
 
+> **A note about this project** — WordLex is primarily an **experiment** (and a Rust learning project) rather than a commercial product. It was built by me with some AI assistance, mostly to learn and to explore what's possible with Rust + Tauri. Expect rough edges; I develop it in my spare time and test mainly on Ubuntu (26.04). If something breaks on your distro or OS, you're welcome to [open an issue](https://github.com/vedesh-padal/wordlex/issues) or send a PR — contributions are appreciated, but please don't expect rapid fixes.
+
 ![WordLex Screenshot](docs/screenshot.png)
 
 ## 🌟 Key Features
@@ -222,7 +224,8 @@ For an in-depth dive into the database schema, query optimizations, Rust applica
 
 This project is licensed under the MIT License. The bundled Open English WordNet database operates under its own permissive open-source license.
 
-## ⚠️ Notes & Limitations
+<details>
+<summary><b>⚠️ Notes & Limitations</b></summary>
 
 ### Global Shortcut on Wayland
 
@@ -233,6 +236,22 @@ The global shortcut (`Alt+W`) works only on **X11** sessions (both X11 and mixed
 
 Because of this, on Wayland the `Alt+W` setting silently has no effect. As a workaround, copy the word you want (`Ctrl+C`), then launch WordLex and it will pick up the clipboard automatically. A proper Wayland-native solution may land in a future release.
 
+### Close-to-Tray on Ubuntu 24.04+ / GNOME
+
+Closing the WordLex window hides the app to the system tray instead of quitting (so it stays warm for the `Alt+W` shortcut). This works out of the box on Ubuntu 22.04 and on most other desktops (KDE Plasma, Cinnamon, MATE, …). On **stock Ubuntu 24.04+ (GNOME)**, however, the tray icon may be **invisible** — the "AppIndicator and KStatusNotifierItem Support" GNOME extension that renders tray icons is **disabled by default** on 24.04, which affects *every* tray app (not just WordLex).
+
+If you close the window on 24.04 and the tray icon doesn't show, the app is still running in the background. Options:
+
+- Re-open it: run `wordlex` again (the single-instance plugin just brings the existing window back), or press `Alt+W`.
+- Fully quit it: `pkill -f wordlex` (or use the tray menu's *Quit* if the icon is visible).
+- Make tray icons visible again on GNOME: install/enable the **AppIndicator** extension (e.g. `gnome-extensions enable ubuntu-appindicator@ubuntu.com`), or use a distro that ships it by default.
+
+This is a desktop-environment limitation, not a WordLex bug — there's no reliable workaround an app can do for a missing tray host. A future version may offer a "quit instead of minimize to tray" setting.
+
+### Memory usage (WebKit/GTK)
+
+WordLex uses the Tauri v2 webview (WebKitGTK on Linux), which carries a significant fixed memory cost — roughly **200–300 MB** idle with the window open, and it can climb **past 500 MB** when the dictionary is loaded and the window is on screen. This is a property of the embedded webview (WebKit/GTK), not the dictionary logic itself — the same UI in a native toolkit would use a fraction of that. It's a known trade-off of the Tauri approach. See `docs/DEVELOPMENT.md` §10 for measured numbers and the WebKit breakdown.
+
 ### AppImage Taskbar Icon
 
 A bare AppImage (double-clicked or run directly from the file manager) shows a generic icon in the app launcher and taskbar — an AppImage-wide platform limitation (affects virtually every AppImage, e.g. Antigravity, t3code). **If your distro ships a native package (`.deb` / `.rpm`), prefer it** — it installs the icon and launcher entry system-wide with no extra steps, and the [Quick Install](#quick-install-one-command) script picks it automatically.
@@ -242,3 +261,4 @@ If you use the AppImage anyway, integrate it once with `--install-cli` (see [App
 ```bash
 gtk-update-icon-cache -f ~/.local/share/icons/hicolor
 ```
+</details>
