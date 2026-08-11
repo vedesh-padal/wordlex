@@ -56,10 +56,26 @@ find_asset() {
 download() { curl -fSL -o "$1" "$2"; }
 
 # ─── Linux ───────────────────────────────────────────────────────────────────
+# Asset filenames are architecture-specific:
+#   x86_64/amd64 -> *_amd64.deb | *-1.x86_64.rpm | *_amd64.AppImage
+#   aarch64/arm64 -> *_arm64.deb | *-1.aarch64.rpm | *_aarch64.AppImage
+case "$(uname -m)" in
+    aarch64 | arm64)
+        LINUX_DEB='_arm64\.deb$'
+        LINUX_RPM='\.aarch64\.rpm$'
+        LINUX_APPIMAGE='_aarch64\.AppImage$'
+        ;;
+    *)
+        LINUX_DEB='_amd64\.deb$'
+        LINUX_RPM='\.x86_64\.rpm$'
+        LINUX_APPIMAGE='_amd64\.AppImage$'
+        ;;
+esac
+
 install_appimage() {
     local target dest file
-    target="$(find_asset '_amd64\.AppImage$')" || true
-    [ -n "$target" ] || die "No AppImage asset found in the WordLex ${VERSION} release."
+    target="$(find_asset "$LINUX_APPIMAGE")" || true
+    [ -n "$target" ] || die "No AppImage asset found for $(uname -m) in the WordLex ${VERSION} release."
 
     dest="$HOME/Applications"
     mkdir -p "$dest"
@@ -76,6 +92,7 @@ install_appimage() {
 
 install_linux() {
     local ext target tmp
+    log "Detected architecture: $(uname -m)."
     if command -v apt-get >/dev/null 2>&1; then
         ext="deb"
         log "Detected a Debian/Ubuntu-based system (apt-get)."
@@ -92,9 +109,9 @@ install_linux() {
     fi
 
     if [ "$ext" = "deb" ]; then
-        target="$(find_asset '_amd64\.deb$')" || true
+        target="$(find_asset "$LINUX_DEB")" || true
     else
-        target="$(find_asset '\.x86_64\.rpm$')" || true
+        target="$(find_asset "$LINUX_RPM")" || true
     fi
     if [ -z "$target" ]; then
         warn "No ${ext} asset found in the release; falling back to the AppImage."
