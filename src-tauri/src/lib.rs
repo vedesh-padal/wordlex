@@ -502,6 +502,45 @@ fn desktop_exec_arg(path: &Path) -> String {
     }
 }
 
+/// The `.desktop` template Tauri also bundles for the `.deb` (see
+/// `tauri.conf.json` → `bundle.linux.deb.desktopTemplate`). Rendering the
+/// `--install-cli` entry from the same file guarantees the user-level entry
+/// and the deb's system entry can never drift apart.
+const DESKTOP_TEMPLATE: &str = include_str!("../wordlex.desktop");
+
+/// Renders a small handlebars-like subset of the `.desktop` template:
+/// `{{key}}` substitutions plus `{{#if key}}...{{/if}}` blocks (kept when the
+/// key is present, dropped when absent). Mirrors what tauri-bundler does when
+/// it materializes `desktopTemplate` for the deb.
+fn render_desktop_template(template: &str, vars: &[(&str, &str)]) -> String {
+    let present = |key: &str| vars.iter().any(|(k, _)| *k == key);
+    let mut out = String::new();
+    let mut skipping = 0usize;
+    for line in template.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("{{#if ") {
+            let key = rest.trim_end_matches("}}");
+            if skipping > 0 || !present(key) {
+                skipping += 1;
+            }
+            continue;
+        }
+        if trimmed == "{{/if}}" {
+            skipping = skipping.saturating_sub(1);
+            continue;
+        }
+        if skipping == 0 {
+            let mut line = line.to_string();
+            for (key, value) in vars {
+                line = line.replace(&format!("{{{{{}}}}}", key), value);
+            }
+            out.push_str(&line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
 /// Installs `WordLex.desktop` plus the `wordlex` icon into `share/applications`
 /// and `share/icons/hicolor/128x128/apps` under `data_dir`.
 ///
@@ -523,17 +562,16 @@ fn install_desktop_entry(data_dir: &Path, launcher: &Path) {
     }
     let _ = std::fs::create_dir_all(&icons_dir);
 
-    let desktop = format!(
-        "[Desktop Entry]\n\
-Name=WordLex\n\
-Comment=A native offline dictionary and thesaurus\n\
-Exec={} %U\n\
-Icon=wordlex\n\
-Type=Application\n\
-Categories=Education;\n\
-StartupWMClass=wordlex\n\
-Terminal=false\n",
-        desktop_exec_arg(launcher)
+    let exec = desktop_exec_arg(launcher);
+    let desktop = render_desktop_template(
+        DESKTOP_TEMPLATE,
+        &[
+            ("exec", &exec),
+            ("name", "WordLex"),
+            ("comment", "A native offline dictionary and thesaurus"),
+            ("icon", "wordlex"),
+            ("categories", "Education;"),
+        ],
     );
     let desktop_path = applications_dir.join("WordLex.desktop");
     if std::fs::write(&desktop_path, desktop).is_ok() {
@@ -976,4 +1014,47 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running WordLex");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{desktop_exec_arg, render_desktop_template, DESKTOP_TEMPLATE};
+
+    #[test]
+    fn renders_desktop_template_with_all_vars() {
+        let out = render_desktop_template(
+            DESKTOP_TEMPLATE,
+            &[
+                ("exec", "/home/user/WordLex.AppImage"),
+                ("name", "WordLex"),
+                ("comment", "A native offline dictionary and thesaurus"),
+                ("icon", "wordlex"),
+                ("categories", "Education;"),
+            ],
+        );
+        assert_eq!(
+            out,
+            "[Desktop Entry]\n\
+Categories=Education;\n\
+Comment=A native offline dictionary and thesaurus\n\
+Exec=/home/user/WordLex.AppImage %U\n\
+Icon=wordlex\n\
+Name=WordLex\n\
+Terminal=false\n\
+Type=Application\n\
+StartupWMClass=wordlex\n"
+        );
+    }
+
+    #[test]
+    fn desktop_exec_arg_quotes_spacey_paths() {
+        assert_eq!(
+            desktop_exec_arg(std::path::Path::new("/opt/My Apps/WordLex.AppImage")),
+            "\"/opt/My Apps/WordLex.AppImage\""
+        );
+        assert_eq!(
+            desktop_exec_arg(std::path::Path::new("/usr/bin/wordlex")),
+            "/usr/bin/wordlex"
+        );
+    }
 }
