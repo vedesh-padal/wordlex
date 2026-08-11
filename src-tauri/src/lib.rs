@@ -20,7 +20,8 @@ use tauri::{
 #[command(
     name = "wordlex",
     about = "WordLex: A lightning-fast native Linux dictionary and thesaurus.",
-    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --cli-json hello   (Outputs full definition as JSON)\n  wordlex --search-json eph  (Outputs prefix search results as JSON)\n  wordlex --random-json      (Outputs a random word as JSON)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)",
+    long_about = "WordLex is an offline, native dictionary that gives you instant definitions, synonyms, antonyms, and relations without ever making an API call.\n\nUsage Examples:\n  wordlex ephemeral          (Opens GUI and searches 'ephemeral')\n  wordlex --cli ephemeral    (Prints definition to terminal instantly)\n  wordlex --cli-json hello   (Outputs full definition as JSON)\n  wordlex --search-json eph  (Outputs prefix search results as JSON)\n  wordlex --random-json      (Outputs a random word as JSON)\n  wordlex --from-clipboard   (Reads clipboard and searches in GUI)\n  wordlex --install-cli      (Links 'wordlex' on PATH for AppImage/portable installs)
+  wordlex --uninstall-cli    (Removes the launcher, desktop entry, and icons)",
     version
 )]
 struct Cli {
@@ -46,6 +47,16 @@ struct Cli {
     /// Read the system clipboard and search for its contents in the GUI (Bypasses Wayland hotkey restrictions).
     #[arg(long, default_value_t = false)]
     pub from_clipboard: bool,
+
+    /// Create a 'wordlex' launcher on PATH so headless CLI and extension use
+    /// works from AppImage / portable installs.
+    #[arg(long, default_value_t = false)]
+    pub install_cli: bool,
+
+    /// Remove the 'wordlex' launcher, desktop entry, and icons installed by
+    /// --install-cli.
+    #[arg(long, default_value_t = false)]
+    pub uninstall_cli: bool,
 
     /// Explicitly specify a word to search in the GUI (Alternative to positional argument).
     #[arg(short, long)]
@@ -466,10 +477,337 @@ fn run_service_mode() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Locates `name` on `$PATH` (for the `--install-cli` already-installed check).
+fn find_on_path(name: &str) -> Option<PathBuf> {
+    std::env::var("PATH")
+        .ok()?
+        .split(':')
+        .map(|dir| PathBuf::from(dir).join(name))
+        .find(|path| path.is_file())
+}
+
+/// The 128×128 PNG bundled with the app, embedded so a desktop entry can be
+/// installed even from a portable AppImage (which keeps icons inside its
+/// filesystem).
+const APP_ICON_128: &[u8] = include_bytes!("../icons/128x128.png");
+
+/// Formats a path for use in a `.desktop` `Exec=` line, quoting it if it
+/// contains characters the desktop-entry grammar treats specially.
+fn desktop_exec_arg(path: &Path) -> String {
+    let s = path.to_string_lossy();
+    if s.contains(char::is_whitespace) || s.contains(['"', '\'', '\\']) {
+        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        s.into_owned()
+    }
+}
+
+/// Installs `WordLex.desktop` plus the `wordlex` icon into `share/applications`
+/// and `share/icons/hicolor/128x128/apps` under `data_dir`.
+///
+/// The desktop id must match the `.deb`'s `WordLex.desktop` so the shell shows
+/// a single WordLex entry: per the XDG spec, a user-level file shadows the
+/// system one, so both install paths converge on one launcher icon.
+///
+/// `Exec=` points at the absolute AppImage path rather than a PATH lookup so
+/// the entry launches even when `wordlex` isn't on `$PATH`.
+fn install_desktop_entry(data_dir: &Path, launcher: &Path) {
+    let applications_dir = data_dir.join("applications");
+    let icons_dir = data_dir
+        .join("icons")
+        .join("hicolor")
+        .join("128x128")
+        .join("apps");
+    if std::fs::create_dir_all(&applications_dir).is_err() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(&icons_dir);
+
+    let desktop = format!(
+        "[Desktop Entry]\n\
+Name=WordLex\n\
+Comment=A native offline dictionary and thesaurus\n\
+Exec={} %U\n\
+Icon=wordlex\n\
+Type=Application\n\
+Categories=Education;\n\
+StartupWMClass=wordlex\n\
+Terminal=false\n",
+        desktop_exec_arg(launcher)
+    );
+    let desktop_path = applications_dir.join("WordLex.desktop");
+    if std::fs::write(&desktop_path, desktop).is_ok() {
+        println!(
+            "{}",
+            format!("Installed desktop entry at: {}", desktop_path.display()).green()
+        );
+    }
+
+    let icon_path = icons_dir.join("wordlex.png");
+    if std::fs::write(&icon_path, APP_ICON_128).is_ok() {
+        println!(
+            "{}",
+            format!("Installed icon at: {}", icon_path.display()).green()
+        );
+    }
+}
+
+/// `--install-cli`: links a `wordlex` launcher on PATH pointing at the current
+/// executable (the AppImage file itself when run from one). Lets the headless
+/// CLI and the Vicinae extension work from portable installs.
+#[cfg(unix)]
+fn install_cli_launcher() -> i32 {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    let target = std::env::var("APPIMAGE")
+        .ok()
+        .filter(|p| !p.trim().is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_exe().ok())
+        .unwrap_or_default();
+
+    if !target.is_file() {
+        eprintln!(
+            "{}",
+            "Error: could not resolve the executable to link.".red()
+        );
+        return 1;
+    }
+
+    let resolved_target = target.canonicalize().unwrap_or_else(|_| target.clone());
+
+    // Already installed? Nothing to do.
+    if let Some(existing) = find_on_path("wordlex") {
+        if existing
+            .canonicalize()
+            .map(|c| c == resolved_target)
+            .unwrap_or(false)
+        {
+            println!(
+                "{}",
+                format!("'wordlex' is already available at {}", existing.display()).green()
+            );
+            if let Some(home) = dirs::home_dir() {
+                install_desktop_entry(&home.join(".local").join("share"), &resolved_target);
+            }
+            return 0;
+        }
+    }
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join(".local").join("bin"));
+    }
+    candidates.push(PathBuf::from("/usr/local/bin"));
+    candidates.push(PathBuf::from("/usr/bin"));
+
+    for dir in &candidates {
+        if !dir.exists() && std::fs::create_dir_all(dir).is_err() {
+            continue;
+        }
+
+        let link = dir.join("wordlex");
+        let _ = std::fs::remove_file(&link);
+
+        if symlink(&resolved_target, &link).is_err() {
+            continue;
+        }
+        // Symlinks cannot have meaningful permissions, but keep parity.
+        let _ = std::fs::set_permissions(&link, std::fs::Permissions::from_mode(0o755));
+
+        println!(
+            "{}",
+            format!("Linked 'wordlex' → {}", resolved_target.display()).green()
+        );
+        println!("Installed CLI launcher at: {}", link.display());
+
+        // Install the desktop entry + icon next to the launcher so the shell
+        // shows WordLex's real icon (AppImages can't display one on their own).
+        if let Some(parent) = dir.parent() {
+            install_desktop_entry(&parent.join("share"), &resolved_target);
+        }
+
+        let dir_str = dir.to_string_lossy();
+        let on_path = std::env::var("PATH")
+            .unwrap_or_default()
+            .split(':')
+            .any(|p| p == dir_str.as_ref());
+        if !on_path {
+            println!(
+                "{}",
+                format!(
+                    "Note: add '{}' to your PATH to use 'wordlex' from the terminal.",
+                    dir_str
+                )
+                .yellow()
+            );
+        }
+        return 0;
+    }
+
+    eprintln!(
+        "{}",
+        "Could not install the CLI launcher (tried ~/.local/bin, /usr/local/bin, /usr/bin). Create the symlink manually.".red()
+    );
+    1
+}
+
+#[cfg(not(unix))]
+fn install_cli_launcher() -> i32 {
+    eprintln!(
+        "{}",
+        "--install-cli is only supported on Linux and macOS.".red()
+    );
+    1
+}
+
+/// Removes the user-level launcher artifacts created by `--install-cli`:
+/// the `wordlex` symlink on PATH, the `WordLex.desktop` entry, and the icon.
+///
+/// Also cleans up the legacy `com.wordlex.desktop.desktop` id from older
+/// versions, which was the cause of duplicate menu entries. The system-level
+/// `.deb` files under `/usr/share` are never touched (dpkg owns those).
+#[cfg(unix)]
+fn uninstall_cli_launcher() -> i32 {
+    let target = std::env::var("APPIMAGE")
+        .ok()
+        .filter(|p| !p.trim().is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_exe().ok())
+        .unwrap_or_default();
+
+    let resolved_target = target.canonicalize().unwrap_or_else(|_| target.clone());
+
+    // ─── Remove the 'wordlex' launcher wherever it points back at this app ───
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join(".local").join("bin"));
+    }
+    candidates.push(PathBuf::from("/usr/local/bin"));
+    candidates.push(PathBuf::from("/usr/bin"));
+
+    let mut removed_any = false;
+    for dir in &candidates {
+        let link = dir.join("wordlex");
+        let Ok(meta) = std::fs::symlink_metadata(&link) else {
+            continue;
+        };
+        if !meta.file_type().is_symlink() {
+            continue;
+        }
+        let Ok(link_target) = std::fs::read_link(&link) else {
+            continue;
+        };
+        let points_at_app = link_target == resolved_target
+            || link_target
+                .canonicalize()
+                .map(|c| c == resolved_target)
+                .unwrap_or(false);
+        if !points_at_app {
+            continue;
+        }
+        match std::fs::remove_file(&link) {
+            Ok(()) => {
+                removed_any = true;
+                println!(
+                    "{}",
+                    format!("Removed launcher: {}", link.display()).green()
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    format!("Warning: could not remove {}: {}", link.display(), e).yellow()
+                );
+            }
+        }
+    }
+    if removed_any {
+        println!(
+            "{}",
+            format!(
+                "Uninstalled CLI launcher (AppImage: {}).",
+                resolved_target.display()
+            )
+            .green()
+        );
+    }
+
+    // ─── Remove the user-level desktop entry (incl. the legacy id) ──────────
+    if let Some(home) = dirs::home_dir() {
+        let applications_dir = home.join(".local").join("share").join("applications");
+        for name in ["WordLex.desktop", "com.wordlex.desktop.desktop"] {
+            let entry = applications_dir.join(name);
+            if entry.exists() {
+                match std::fs::remove_file(&entry) {
+                    Ok(()) => println!(
+                        "{}",
+                        format!("Removed desktop entry: {}", entry.display()).green()
+                    ),
+                    Err(e) => eprintln!(
+                        "{}",
+                        format!("Warning: could not remove {}: {}", entry.display(), e).yellow()
+                    ),
+                }
+            }
+        }
+
+        // ─── Remove the icon from every hicolor size we may have written ─────
+        let icons_base = home
+            .join(".local")
+            .join("share")
+            .join("icons")
+            .join("hicolor");
+        if let Ok(sizes) = std::fs::read_dir(&icons_base) {
+            for size in sizes.flatten() {
+                let icon = size.path().join("apps").join("wordlex.png");
+                if icon.exists() {
+                    match std::fs::remove_file(&icon) {
+                        Ok(()) => {
+                            println!("{}", format!("Removed icon: {}", icon.display()).green())
+                        }
+                        Err(e) => eprintln!(
+                            "{}",
+                            format!("Warning: could not remove {}: {}", icon.display(), e).yellow()
+                        ),
+                    }
+                }
+            }
+        }
+    }
+
+    if removed_any {
+        0
+    } else {
+        eprintln!(
+            "{}",
+            "No WordLex CLI launcher was found; nothing to uninstall.".yellow()
+        );
+        1
+    }
+}
+
+#[cfg(not(unix))]
+fn uninstall_cli_launcher() -> i32 {
+    eprintln!(
+        "{}",
+        "--uninstall-cli is only supported on Linux and macOS.".red()
+    );
+    1
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // ─── Headless CLI / runtime mode dispatch: runs BEFORE Tauri ───
     let cli = Cli::parse();
+    if cli.install_cli {
+        std::process::exit(install_cli_launcher());
+    }
+
+    if cli.uninstall_cli {
+        std::process::exit(uninstall_cli_launcher());
+    }
+
     if cli.service {
         if server::is_service_running() {
             println!("{}", "WordLex service is already running.".green());
