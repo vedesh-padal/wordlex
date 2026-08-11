@@ -54,9 +54,10 @@ To install a specific version instead of the latest: `VERSION=2.0.0 curl -fsSL â
 <summary><b>Removing the `.deb` install</b></summary>
 
 The package manager owns the binary, desktop entry, icon, and launcher entry, so removal is a single command:
+(`wordlex` is occupied, hence it will be installed with name `word-lex`, hence have to uninstall with `word-lex`, but you can invoke it with `wordlex`)
 
 ```bash
-sudo dpkg -r wordlex
+sudo dpkg -r word-lex
 ```
 
 Your search history lives in `~/.local/share/com.wordlex.desktop` and is kept on uninstall; delete that folder too if you want a complete wipe.
